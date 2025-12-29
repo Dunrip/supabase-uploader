@@ -1,0 +1,8 @@
+{
+  "supabaseUrl": "https://your-project-id.supabase.co",
+  "defaultBucket": "files",
+  "maxRetries": 3,
+  "logFile": "supabase-uploader.log",
+  "enableLogging": true,
+  "supabaseKey": "your-service-role-key-here"
+}

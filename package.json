@@ -1,11 +1,14 @@
 {
-  "name": "supabase-file-uploader",
+  "name": "supabase-file-manager",
   "version": "1.0.0",
-  "description": "Node.js script to push files to Supabase Storage for custom automation",
+  "description": "Modern web application for managing files in Supabase Storage with beautiful dark UI and CLI automation",
   "main": "uploadToSupabase.js",
   "scripts": {
-    "start": "node uploadToSupabase.js",
-    "upload": "node uploadToSupabase.js"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "cli": "node uploadToSupabase.js"
   },
   "keywords": [
     "supabase",
@@ -19,7 +22,22 @@
     "@supabase/supabase-js": "^2.39.0",
     "cli-progress": "^3.12.0",
     "dotenv": "^16.3.1",
-    "inquirer": "^8.2.7"
+    "formidable": "^3.5.1",
+    "inquirer": "^8.2.7",
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.55.0",
+    "eslint-config-next": "^14.0.4",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.6",
+    "typescript": "^5.3.3"
   },
   "engines": {
     "node": ">=14.0.0"

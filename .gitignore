@@ -3,6 +3,8 @@ node_modules/
 
 # Environment variables
 .env
+.env.local
+.env*.local
 
 # Logs
 *.log
@@ -15,3 +17,22 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Temporary upload files
+temp/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Config files with sensitive data
+config/settings.json
+config/.encryption-key
+config/*.key
+config/*.secret
