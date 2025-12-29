@@ -624,16 +624,17 @@ async function interactiveMode() {
         type: 'rawlist',
         name: 'action',
         message: 'What would you like to do? (Enter number)',
+        prefix: '',
         choices: [
-          { name: '1) Upload File', value: 'upload' },
-          { name: '2) Upload Multiple Files', value: 'batch-upload' },
-          { name: '3) Upload Directory', value: 'upload-dir' },
-          { name: '4) Download File', value: 'download' },
-          { name: '5) Download Multiple Files', value: 'batch-download' },
-          { name: '6) List Files', value: 'list' },
-          { name: '7) Delete File', value: 'delete' },
-          { name: '8) View Log File', value: 'view-log' },
-          { name: '9) Exit', value: 'exit' }
+          { name: 'Upload File', value: 'upload' },
+          { name: 'Upload Multiple Files', value: 'batch-upload' },
+          { name: 'Upload Directory', value: 'upload-dir' },
+          { name: 'Download File', value: 'download' },
+          { name: 'Download Multiple Files', value: 'batch-download' },
+          { name: 'List Files', value: 'list' },
+          { name: 'Delete File', value: 'delete' },
+          { name: 'View Log File', value: 'view-log' },
+          { name: 'Exit', value: 'exit' }
         ],
         pageSize: 9
       }
