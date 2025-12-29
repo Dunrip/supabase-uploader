@@ -1,11 +1,11 @@
 @echo off
-setlocal enabledelayedexpansion
+REM Simple launcher for Interactive Mode
+REM This file launches the Supabase Uploader in interactive mode
 
-REM Get the directory where the batch file is located
 set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%"
 
-REM Check if Node.js is installed
+REM Quick check for Node.js
 where node >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo.
@@ -16,33 +16,32 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-REM Check if node_modules exists, if not install dependencies
+REM Auto-install dependencies if needed
 if not exist "node_modules" (
     echo.
-    echo [INFO] Installing dependencies...
+    echo [INFO] Installing dependencies for the first time...
     echo.
-    call npm install
+    call npm install --silent
     if %ERRORLEVEL% NEQ 0 (
-        echo.
         echo [ERROR] Failed to install dependencies
-        echo.
         pause
         exit /b 1
     )
 )
 
-REM Check if .env file exists
-if not exist ".env" (
-    echo.
-    echo [WARNING] .env file not found!
-    echo Please create a .env file with your Supabase credentials.
-    echo See env.example for reference.
-    echo.
-    echo Press any key to continue anyway...
-    pause >nul
-)
-
-REM Run in interactive mode
+REM Launch interactive mode
+cls
+echo.
+echo ========================================
+echo   Supabase File Uploader
+echo   Interactive Mode
+echo ========================================
+echo.
 node uploadToSupabase.js --interactive
 
-endlocal
+REM Keep window open if there was an error
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo Press any key to exit...
+    pause >nul
+)
