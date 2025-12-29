@@ -44,12 +44,6 @@ if not exist ".env" (
 
 REM Launch interactive mode
 cls
-echo.
-echo ========================================
-echo   Supabase File Uploader
-echo   Interactive Mode
-echo ========================================
-echo.
 node uploadToSupabase.js --interactive
 
 REM Keep window open if there was an error

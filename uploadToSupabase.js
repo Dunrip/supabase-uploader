@@ -614,30 +614,33 @@ async function deleteFile(storagePath, bucketName = DEFAULT_BUCKET) {
  * Interactive CLI mode
  */
 async function interactiveMode() {
-  console.log('\n📦 Supabase File Uploader - Interactive Mode\n');
+  console.log('\n========================================');
+  console.log('  Supabase File Uploader - Interactive Mode');
+  console.log('========================================\n');
   
   while (true) {
     const { action } = await inquirer.prompt([
       {
-        type: 'list',
+        type: 'rawlist',
         name: 'action',
-        message: 'What would you like to do?',
+        message: 'What would you like to do? (Enter number)',
         choices: [
-          { name: '📤 Upload File', value: 'upload' },
-          { name: '📤 Upload Multiple Files', value: 'batch-upload' },
-          { name: '📁 Upload Directory', value: 'upload-dir' },
-          { name: '📥 Download File', value: 'download' },
-          { name: '📥 Download Multiple Files', value: 'batch-download' },
-          { name: '📋 List Files', value: 'list' },
-          { name: '🗑️  Delete File', value: 'delete' },
-          { name: '📄 View Log File', value: 'view-log' },
-          { name: '❌ Exit', value: 'exit' }
-        ]
+          { name: '1) Upload File', value: 'upload' },
+          { name: '2) Upload Multiple Files', value: 'batch-upload' },
+          { name: '3) Upload Directory', value: 'upload-dir' },
+          { name: '4) Download File', value: 'download' },
+          { name: '5) Download Multiple Files', value: 'batch-download' },
+          { name: '6) List Files', value: 'list' },
+          { name: '7) Delete File', value: 'delete' },
+          { name: '8) View Log File', value: 'view-log' },
+          { name: '9) Exit', value: 'exit' }
+        ],
+        pageSize: 9
       }
     ]);
 
     if (action === 'exit') {
-      console.log('\n👋 Goodbye!\n');
+      console.log('\nGoodbye!\n');
       break;
     }
 
@@ -715,7 +718,7 @@ async function interactiveMode() {
           if (confirm) {
             await deleteFile(storagePath, bucket);
           } else {
-            console.log('❌ Deletion cancelled');
+            console.log('Deletion cancelled');
           }
           break;
         }
@@ -724,11 +727,11 @@ async function interactiveMode() {
           if (fs.existsSync(LOG_FILE)) {
             const logContent = fs.readFileSync(LOG_FILE, 'utf8');
             const lines = logContent.split('\n').filter(l => l.trim());
-            console.log(`\n📄 Last 20 log entries:\n`);
+            console.log(`\nLast 20 log entries:\n`);
             lines.slice(-20).forEach(line => console.log(line));
-            console.log(`\n📁 Full log file: ${path.resolve(LOG_FILE)}\n`);
+            console.log(`\nFull log file: ${path.resolve(LOG_FILE)}\n`);
           } else {
-            console.log(`\n📄 No log file found at: ${LOG_FILE}\n`);
+            console.log(`\nNo log file found at: ${LOG_FILE}\n`);
           }
           break;
         }
@@ -744,7 +747,7 @@ async function interactiveMode() {
     ]);
 
     if (!shouldContinue) {
-      console.log('\n👋 Goodbye!\n');
+      console.log('\nGoodbye!\n');
       break;
     }
   }
