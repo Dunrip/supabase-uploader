@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "cli": "node uploadToSupabase.js"
+    "cli": "node uploadToSupabase.js",
+    "setup": "node -e \"console.log('Run setup.bat for Windows setup')\""
   },
   "keywords": [
     "supabase",
