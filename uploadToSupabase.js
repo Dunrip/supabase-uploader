@@ -31,7 +31,7 @@ const ENABLE_LOGGING = process.env.ENABLE_LOGGING !== 'false'; // Default to tru
 
 // Validate environment variables
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error('❌ Error: Missing required environment variables');
+  console.error('Error: Missing required environment variables');
   console.error('Please set SUPABASE_URL and SUPABASE_KEY in your .env file');
   console.error('\nExample .env file:');
   console.error('SUPABASE_URL=https://your-project.supabase.co');
@@ -113,10 +113,10 @@ async function retryWithBackoff(fn, maxRetries = MAX_RETRIES, operationName = 'O
       
       if (attempt < maxRetries) {
         const delay = RETRY_DELAY_BASE * Math.pow(2, attempt); // Exponential backoff
-        console.log(`⚠️  ${operationName} failed (attempt ${attempt + 1}/${maxRetries + 1}). Retrying in ${delay}ms...`);
+        console.log(`${operationName} failed (attempt ${attempt + 1}/${maxRetries + 1}). Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
-        console.error(`❌ ${operationName} failed after ${maxRetries + 1} attempts`);
+        console.error(`${operationName} failed after ${maxRetries + 1} attempts`);
       }
     }
   }
@@ -162,14 +162,14 @@ async function uploadFile(filePath, bucketName = DEFAULT_BUCKET, storagePath = n
     let progressBar;
     if (showProgress && fileSize > 1024) { // Only show progress for files > 1KB
       progressBar = new cliProgress.SingleBar({
-        format: `📤 Uploading: ${fileName} |{bar}| {percentage}% | {value}/{total} ${formatFileSize(fileSize)} | ETA: {eta}s`,
+        format: `Uploading: ${fileName} |{bar}| {percentage}% | {value}/{total} ${formatFileSize(fileSize)} | ETA: {eta}s`,
         barCompleteChar: '\u2588',
         barIncompleteChar: '\u2591',
         hideCursor: true
       });
       progressBar.start(fileSize, 0);
     } else {
-      console.log(`📤 Uploading: ${fileName} (${formatFileSize(fileSize)})`);
+      console.log(`Uploading: ${fileName} (${formatFileSize(fileSize)})`);
     }
 
     // Read file
@@ -204,7 +204,7 @@ async function uploadFile(filePath, bucketName = DEFAULT_BUCKET, storagePath = n
       .from(bucketName)
       .getPublicUrl(finalStoragePath);
 
-    console.log(`✅ Upload successful!`);
+    console.log(`Upload successful!`);
     console.log(`   Bucket: ${bucketName}`);
     console.log(`   Storage Path: ${uploadResult.path}`);
     console.log(`   Public URL: ${urlData.publicUrl}`);
@@ -227,7 +227,7 @@ async function uploadFile(filePath, bucketName = DEFAULT_BUCKET, storagePath = n
     };
 
   } catch (error) {
-    console.error(`❌ Upload failed:`, error.message);
+    console.error(`Upload failed:`, error.message);
     logError('Upload failed', { filePath, bucket: bucketName, error: error.message });
     return {
       success: false,
@@ -249,7 +249,7 @@ async function uploadMultipleFiles(filePaths, bucketName = DEFAULT_BUCKET, baseS
   
   // Create batch progress bar
   const batchProgressBar = new cliProgress.SingleBar({
-    format: `📦 Batch Upload |{bar}| {percentage}% | {value}/{total} files | ETA: {eta}s`,
+    format: `Batch Upload |{bar}| {percentage}% | {value}/{total} files | ETA: {eta}s`,
     barCompleteChar: '\u2588',
     barIncompleteChar: '\u2591',
     hideCursor: true
@@ -286,10 +286,10 @@ async function uploadMultipleFiles(filePaths, bucketName = DEFAULT_BUCKET, baseS
 
   batchProgressBar.stop();
   
-  console.log(`\n📊 Batch Upload Summary:`);
-  console.log(`   ✅ Successful: ${successCount}`);
-  console.log(`   ❌ Failed: ${failCount}`);
-  console.log(`   📁 Total: ${totalFiles}`);
+  console.log(`\nBatch Upload Summary:`);
+  console.log(`   Successful: ${successCount}`);
+  console.log(`   Failed: ${failCount}`);
+  console.log(`   Total: ${totalFiles}`);
 
   return results;
 }
@@ -329,7 +329,7 @@ async function uploadDirectory(dirPath, bucketName = DEFAULT_BUCKET, baseStorage
 
   scanDirectory(dirPath);
 
-  console.log(`📁 Found ${files.length} file(s) in directory`);
+  console.log(`Found ${files.length} file(s) in directory`);
 
   // Use batch upload for directory
   const filePaths = files.map(f => f.fullPath);
@@ -354,7 +354,7 @@ async function downloadFile(storagePath, bucketName = DEFAULT_BUCKET, localPath 
     const fileName = path.basename(storagePath);
     const finalLocalPath = localPath || fileName;
 
-    console.log(`📥 Downloading: ${storagePath}`);
+    console.log(`Downloading: ${storagePath}`);
     console.log(`   Bucket: ${bucketName}`);
     console.log(`   Saving to: ${finalLocalPath}`);
 
@@ -396,7 +396,7 @@ async function downloadFile(storagePath, bucketName = DEFAULT_BUCKET, localPath 
 
     // Create progress bar
     const progressBar = new cliProgress.SingleBar({
-      format: `📥 Downloading |{bar}| {percentage}% | {value}/{total} ${formatFileSize(fileSize)} | ETA: {eta}s`,
+      format: `Downloading |{bar}| {percentage}% | {value}/{total} ${formatFileSize(fileSize)} | ETA: {eta}s`,
       barCompleteChar: '\u2588',
       barIncompleteChar: '\u2591',
       hideCursor: true
@@ -417,7 +417,7 @@ async function downloadFile(storagePath, bucketName = DEFAULT_BUCKET, localPath 
     progressBar.update(fileSize);
     progressBar.stop();
 
-    console.log(`✅ Download successful!`);
+    console.log(`Download successful!`);
     console.log(`   File: ${finalLocalPath}`);
     console.log(`   Size: ${formatFileSize(fileSize)}`);
 
@@ -435,7 +435,7 @@ async function downloadFile(storagePath, bucketName = DEFAULT_BUCKET, localPath 
     };
 
   } catch (error) {
-    console.error(`❌ Download failed:`, error.message);
+    console.error(`Download failed:`, error.message);
     
     // Provide helpful error messages
     if (error.statusCode || error.status) {
@@ -476,7 +476,7 @@ async function downloadMultipleFiles(storagePaths, bucketName = DEFAULT_BUCKET, 
   
   // Create batch progress bar
   const batchProgressBar = new cliProgress.SingleBar({
-    format: `📥 Batch Download |{bar}| {percentage}% | {value}/{total} files | ETA: {eta}s`,
+    format: `Batch Download |{bar}| {percentage}% | {value}/{total} files | ETA: {eta}s`,
     barCompleteChar: '\u2588',
     barIncompleteChar: '\u2591',
     hideCursor: true
@@ -513,10 +513,10 @@ async function downloadMultipleFiles(storagePaths, bucketName = DEFAULT_BUCKET, 
 
   batchProgressBar.stop();
   
-  console.log(`\n📊 Batch Download Summary:`);
-  console.log(`   ✅ Successful: ${successCount}`);
-  console.log(`   ❌ Failed: ${failCount}`);
-  console.log(`   📁 Total: ${totalFiles}`);
+  console.log(`\nBatch Download Summary:`);
+  console.log(`   Successful: ${successCount}`);
+  console.log(`   Failed: ${failCount}`);
+  console.log(`   Total: ${totalFiles}`);
 
   return results;
 }
@@ -561,7 +561,7 @@ async function listFiles(bucketName = DEFAULT_BUCKET, folderPath = '') {
 
     if (error) throw error;
 
-    console.log(`📋 Files in bucket '${bucketName}'${folderPath ? ` (${folderPath})` : ''}:`);
+    console.log(`Files in bucket '${bucketName}'${folderPath ? ` (${folderPath})` : ''}:`);
     if (data.length === 0) {
       console.log('   (empty)');
     } else {
@@ -574,7 +574,7 @@ async function listFiles(bucketName = DEFAULT_BUCKET, folderPath = '') {
     logInfo('Files listed', { bucket: bucketName, folderPath, count: data.length });
     return data;
   } catch (error) {
-    console.error(`❌ Error listing files:`, error.message);
+    console.error(`Error listing files:`, error.message);
     logError('List files failed', { bucket: bucketName, folderPath, error: error.message });
     return [];
   }
@@ -600,11 +600,11 @@ async function deleteFile(storagePath, bucketName = DEFAULT_BUCKET) {
       return true;
     }, MAX_RETRIES, `Delete ${storagePath}`);
 
-    console.log(`✅ Deleted: ${storagePath}`);
+    console.log(`Deleted: ${storagePath}`);
     logSuccess('File deleted', { storagePath, bucket: bucketName });
     return true;
   } catch (error) {
-    console.error(`❌ Delete failed:`, error.message);
+    console.error(`Delete failed:`, error.message);
     logError('Delete failed', { storagePath, bucket: bucketName, error: error.message });
     return false;
   }
@@ -649,9 +649,9 @@ async function interactiveMode() {
       switch (action) {
         case 'upload': {
           const { filePath, bucket, storagePath } = await inquirer.prompt([
-            { type: 'input', name: 'filePath', message: 'File path to upload:' },
-            { type: 'input', name: 'bucket', message: 'Bucket name:', default: DEFAULT_BUCKET },
-            { type: 'input', name: 'storagePath', message: 'Storage path (optional, press Enter to use filename):', default: '' }
+            { type: 'input', name: 'filePath', message: 'File path to upload:', prefix: '' },
+            { type: 'input', name: 'bucket', message: 'Bucket name:', default: DEFAULT_BUCKET, prefix: '' },
+            { type: 'input', name: 'storagePath', message: 'Storage path (optional, press Enter to use filename):', default: '', prefix: '' }
           ]);
           await uploadFile(filePath, bucket, storagePath || null);
           break;
@@ -659,9 +659,9 @@ async function interactiveMode() {
 
         case 'batch-upload': {
           const { filePaths, bucket, basePath } = await inquirer.prompt([
-            { type: 'input', name: 'filePaths', message: 'File paths (comma-separated):' },
-            { type: 'input', name: 'bucket', message: 'Bucket name:', default: DEFAULT_BUCKET },
-            { type: 'input', name: 'basePath', message: 'Base storage path (optional):', default: '' }
+            { type: 'input', name: 'filePaths', message: 'File paths (comma-separated):', prefix: '' },
+            { type: 'input', name: 'bucket', message: 'Bucket name:', default: DEFAULT_BUCKET, prefix: '' },
+            { type: 'input', name: 'basePath', message: 'Base storage path (optional):', default: '', prefix: '' }
           ]);
           const files = filePaths.split(',').map(f => f.trim()).filter(f => f);
           await uploadMultipleFiles(files, bucket, basePath);
@@ -670,9 +670,9 @@ async function interactiveMode() {
 
         case 'upload-dir': {
           const { dirPath, bucket, basePath } = await inquirer.prompt([
-            { type: 'input', name: 'dirPath', message: 'Directory path:' },
-            { type: 'input', name: 'bucket', message: 'Bucket name:', default: DEFAULT_BUCKET },
-            { type: 'input', name: 'basePath', message: 'Base storage path (optional):', default: '' }
+            { type: 'input', name: 'dirPath', message: 'Directory path:', prefix: '' },
+            { type: 'input', name: 'bucket', message: 'Bucket name:', default: DEFAULT_BUCKET, prefix: '' },
+            { type: 'input', name: 'basePath', message: 'Base storage path (optional):', default: '', prefix: '' }
           ]);
           await uploadDirectory(dirPath, bucket, basePath, true);
           break;
@@ -680,9 +680,9 @@ async function interactiveMode() {
 
         case 'download': {
           const { storagePath, bucket, localPath } = await inquirer.prompt([
-            { type: 'input', name: 'storagePath', message: 'Storage path to download:' },
-            { type: 'input', name: 'bucket', message: 'Bucket name:', default: DEFAULT_BUCKET },
-            { type: 'input', name: 'localPath', message: 'Local path to save (optional):', default: '' }
+            { type: 'input', name: 'storagePath', message: 'Storage path to download:', prefix: '' },
+            { type: 'input', name: 'bucket', message: 'Bucket name:', default: DEFAULT_BUCKET, prefix: '' },
+            { type: 'input', name: 'localPath', message: 'Local path to save (optional):', default: '', prefix: '' }
           ]);
           await downloadFile(storagePath, bucket, localPath || null);
           break;
@@ -690,9 +690,9 @@ async function interactiveMode() {
 
         case 'batch-download': {
           const { storagePaths, bucket, localDir } = await inquirer.prompt([
-            { type: 'input', name: 'storagePaths', message: 'Storage paths (comma-separated):' },
-            { type: 'input', name: 'bucket', message: 'Bucket name:', default: DEFAULT_BUCKET },
-            { type: 'input', name: 'localDir', message: 'Local directory (optional):', default: '' }
+            { type: 'input', name: 'storagePaths', message: 'Storage paths (comma-separated):', prefix: '' },
+            { type: 'input', name: 'bucket', message: 'Bucket name:', default: DEFAULT_BUCKET, prefix: '' },
+            { type: 'input', name: 'localDir', message: 'Local directory (optional):', default: '', prefix: '' }
           ]);
           const paths = storagePaths.split(',').map(p => p.trim()).filter(p => p);
           await downloadMultipleFiles(paths, bucket, localDir);
@@ -701,8 +701,8 @@ async function interactiveMode() {
 
         case 'list': {
           const { bucket, folderPath } = await inquirer.prompt([
-            { type: 'input', name: 'bucket', message: 'Bucket name:', default: DEFAULT_BUCKET },
-            { type: 'input', name: 'folderPath', message: 'Folder path (optional):', default: '' }
+            { type: 'input', name: 'bucket', message: 'Bucket name:', default: DEFAULT_BUCKET, prefix: '' },
+            { type: 'input', name: 'folderPath', message: 'Folder path (optional):', default: '', prefix: '' }
           ]);
           await listFiles(bucket, folderPath);
           break;
@@ -710,11 +710,11 @@ async function interactiveMode() {
 
         case 'delete': {
           const { storagePath, bucket } = await inquirer.prompt([
-            { type: 'input', name: 'storagePath', message: 'Storage path to delete:' },
-            { type: 'input', name: 'bucket', message: 'Bucket name:', default: DEFAULT_BUCKET }
+            { type: 'input', name: 'storagePath', message: 'Storage path to delete:', prefix: '' },
+            { type: 'input', name: 'bucket', message: 'Bucket name:', default: DEFAULT_BUCKET, prefix: '' }
           ]);
           const { confirm } = await inquirer.prompt([
-            { type: 'confirm', name: 'confirm', message: `Are you sure you want to delete "${storagePath}"?`, default: false }
+            { type: 'confirm', name: 'confirm', message: `Are you sure you want to delete "${storagePath}"?`, default: false, prefix: '' }
           ]);
           if (confirm) {
             await deleteFile(storagePath, bucket);
@@ -738,13 +738,13 @@ async function interactiveMode() {
         }
       }
     } catch (error) {
-      console.error(`\n❌ Error: ${error.message}\n`);
+      console.error(`\nError: ${error.message}\n`);
       logError('Interactive mode error', { action, error: error.message });
     }
 
     // Ask if user wants to continue
     const { continue: shouldContinue } = await inquirer.prompt([
-      { type: 'confirm', name: 'continue', message: '\nContinue?', default: true }
+      { type: 'confirm', name: 'continue', message: '\nContinue?', default: true, prefix: '' }
     ]);
 
     if (!shouldContinue) {
@@ -765,7 +765,7 @@ async function main() {
   }
 
   if (args.length === 0) {
-    console.log('📦 Supabase File Uploader');
+    console.log('Supabase File Uploader');
     console.log('\nUsage:');
     console.log('  Interactive Mode:');
     console.log('    node uploadToSupabase.js --interactive');
@@ -800,7 +800,7 @@ async function main() {
   // Handle delete command
   if (args[0] === '--delete') {
     if (!args[1]) {
-      console.error('❌ Error: Storage path required for delete');
+      console.error('Error: Storage path required for delete');
       process.exit(1);
     }
     const storagePath = args[1];
@@ -812,7 +812,7 @@ async function main() {
   // Handle batch upload
   if (args[0] === '--batch') {
     if (args.length < 2) {
-      console.error('❌ Error: At least one file path required for batch upload');
+      console.error('Error: At least one file path required for batch upload');
       process.exit(1);
     }
     
@@ -841,7 +841,7 @@ async function main() {
   // Handle batch download
   if (args[0] === '--download-batch') {
     if (args.length < 2) {
-      console.error('❌ Error: At least one storage path required for batch download');
+      console.error('Error: At least one storage path required for batch download');
       process.exit(1);
     }
     
@@ -868,7 +868,7 @@ async function main() {
   // Handle single download
   if (args[0] === '--download') {
     if (!args[1]) {
-      console.error('❌ Error: Storage path required for download');
+      console.error('Error: Storage path required for download');
       process.exit(1);
     }
     const storagePath = args[1];
@@ -901,7 +901,7 @@ async function main() {
   // Check if it's a directory
   const stat = fs.statSync(filePath);
   if (stat.isDirectory()) {
-    console.log(`📁 Uploading directory: ${filePath}`);
+    console.log(`Uploading directory: ${filePath}`);
     await uploadDirectory(filePath, bucketName, storagePath, true);
   } else {
     await uploadFile(filePath, bucketName, storagePath);
@@ -911,7 +911,7 @@ async function main() {
 // Run if executed directly
 if (require.main === module) {
   main().catch(error => {
-    console.error('❌ Fatal error:', error);
+    console.error('Fatal error:', error);
     process.exit(1);
   });
 }
