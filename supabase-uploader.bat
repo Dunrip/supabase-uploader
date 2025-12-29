@@ -29,11 +29,18 @@ if not exist "node_modules" (
     )
 )
 
-REM Check if .env file exists (warning only, don't block)
+REM Auto-create .env from env.example if it doesn't exist
 if not exist ".env" (
-    echo [WARNING] .env file not found! Some operations may fail.
-    echo Create a .env file with your Supabase credentials (see env.example)
-    echo.
+    if exist "env.example" (
+        echo [INFO] Creating .env file from env.example...
+        copy env.example .env >nul
+        echo [SUCCESS] .env file created! Please edit it with your Supabase credentials.
+        echo.
+    ) else (
+        echo [WARNING] .env file not found and env.example doesn't exist!
+        echo Some operations may fail. Create a .env file with your Supabase credentials.
+        echo.
+    )
 )
 
 REM If no arguments provided, show help

@@ -29,6 +29,19 @@ if not exist "node_modules" (
     )
 )
 
+REM Auto-create .env from env.example if it doesn't exist
+if not exist ".env" (
+    if exist "env.example" (
+        echo.
+        echo [INFO] Creating .env file from env.example...
+        copy env.example .env >nul
+        echo [SUCCESS] .env file created!
+        echo [IMPORTANT] Please edit .env and add your Supabase credentials before continuing.
+        echo.
+        pause
+    )
+)
+
 REM Launch interactive mode
 cls
 echo.
