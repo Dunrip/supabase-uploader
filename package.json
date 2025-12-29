@@ -1,0 +1,27 @@
+{
+  "name": "supabase-file-uploader",
+  "version": "1.0.0",
+  "description": "Node.js script to push files to Supabase Storage for custom automation",
+  "main": "uploadToSupabase.js",
+  "scripts": {
+    "start": "node uploadToSupabase.js",
+    "upload": "node uploadToSupabase.js"
+  },
+  "keywords": [
+    "supabase",
+    "file-upload",
+    "storage",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "cli-progress": "^3.12.0",
+    "dotenv": "^16.3.1",
+    "inquirer": "^8.2.7"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
