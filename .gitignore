@@ -36,3 +36,6 @@ config/settings.json
 config/.encryption-key
 config/*.key
 config/*.secret
+
+# Auto Claude data directory
+.auto-claude/
