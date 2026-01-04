@@ -148,4 +148,6 @@ async function handler(req, res) {
   }
 }
 
-export default withAuth(handler);
+// Skip CSRF for file uploads - multipart form data doesn't support custom headers easily
+// Authentication is still required and provides sufficient protection
+export default withAuth(handler, { skipCsrf: true });

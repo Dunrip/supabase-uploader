@@ -170,7 +170,12 @@
 - [ ] **File Versioning** - Keep upload history
 - [ ] **Storage Quota Display** - Show bucket usage stats
 - [ ] **Compression** - Zip multiple files for download
-- [ ] **Mobile Polish** - Improve touch interactions
+- [x] **Mobile Responsive Design** - Touch-friendly UI
+  - ✅ 44px minimum touch targets (iOS/Android guidelines)
+  - ✅ Responsive layouts (stack on mobile, row on desktop)
+  - ✅ Condensed button text on mobile
+  - ✅ Full-width inputs on mobile screens
+  - ✅ Responsive text sizes and spacing
 - [ ] **Dark/Light Theme Toggle** - Currently dark only
 - [ ] **Breadcrumb Navigation** - For folder paths
 - [ ] **Recent Files** - Quick access to recently uploaded
@@ -234,6 +239,98 @@ Post-Deployment:
 [ ] Check error handling
 [ ] Monitor for issues
 ```
+
+---
+
+## Performance & Supabase Improvements
+
+### High Priority
+- [x] **Update Supabase SDK** - Updated from v2.39.0 to v2.49.0
+  - ✅ Updated `package.json` dependency to `^2.49.0`
+  - ✅ No breaking changes - v2.x maintains backwards compatibility
+  - Run `npm install` to apply the update
+
+- [x] **File Streaming for Large Uploads** - Memory optimization
+  - ✅ Implemented in `utils/storageOperations.js`
+  - ✅ Files > 10MB use `fs.createReadStream()` for streaming uploads
+  - ✅ Smaller files use direct `readFileSync()` for efficiency
+  - ✅ Added `streamToBuffer()` helper function
+  - ✅ Reduces memory footprint for large file uploads
+
+- [x] **Supabase Client Caching** - Reduce overhead
+  - ✅ Implemented LRU cache in `utils/storageClientFactory.js`
+  - ✅ 5-minute TTL with automatic expiration
+  - ✅ Max 100 cached clients (configurable)
+  - ✅ Keyed by user ID + Supabase URL for multi-tenant safety
+  - ✅ Auto-invalidation when user updates credentials (`/api/settings`)
+  - ✅ Periodic cleanup every 2 minutes
+  - ✅ Exported `invalidateClientCache()` and `getClientCacheStats()` utilities
+
+- [x] **Distributed Rate Limiting** - Production scalability
+  - ✅ Refactored `middleware.js` with class-based rate limiters
+  - ✅ In-memory fallback for development/single-instance
+  - ✅ **Upstash Redis support** - Set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` for distributed rate limiting
+  - ✅ Automatic detection: uses Upstash when configured, in-memory otherwise
+  - ✅ Fail-open design: allows requests if Redis is unavailable
+  - ✅ Added Cloudflare IP header support (`cf-connecting-ip`)
+  - ✅ Comprehensive documentation for production deployment options
+
+### Medium Priority
+- [ ] **Resumable Uploads (TUS Protocol)** - Large file reliability
+  - Supabase Storage supports TUS for resumable uploads
+  - Use for files > 6MB threshold
+  - Enables pause/resume capability
+
+- [ ] **Supabase Image Transformations** - Built-in optimization
+  - Use `getPublicUrl()` with transform options for thumbnails
+  - Options: width, height, resize mode, quality
+  - Reduces bandwidth for image previews
+
+- [ ] **Real-time File Updates** - Live notifications
+  - Use Supabase Realtime to listen for storage changes
+  - Notify users when files are uploaded/deleted by others
+  - Subscribe to `storage.objects` table changes
+
+- [ ] **TypeScript Migration** - Type safety
+  - Project has TS config but uses JavaScript
+  - Migrate `.js` → `.ts`, `.jsx` → `.tsx`
+  - Add proper typing for Supabase responses
+
+### Lower Priority
+- [ ] **React Query/SWR for Data Fetching** - Better caching
+  - Replace manual `useState`/`useEffect` with SWR
+  - Automatic revalidation and caching
+  - Reduces API calls and improves UX
+
+- [ ] **Parallel File Uploads** - Faster batch uploads
+  - `UploadTab.js` uploads sequentially
+  - Add concurrency control with `p-limit` (3-5 concurrent)
+  - Show aggregate progress
+
+- [ ] **Signed URL Caching** - Reduce API calls
+  - Cache signed URLs on client (50 min TTL, URLs expire at 60)
+  - Use Map or localStorage for persistence
+
+- [ ] **Upload Chunking** - Very large files
+  - For files near 100MB limit
+  - 5MB chunks with progress tracking
+  - Reassemble on server or use multipart upload
+
+### Security Enhancements
+- [x] **CSRF Protection** - State-changing operations
+  - ✅ Generate signed CSRF token on page load via `/api/csrf` endpoint
+  - ✅ Token stored in cookie (signed with HMAC-SHA256)
+  - ✅ Validate on POST/DELETE/PUT/PATCH requests
+  - ✅ Middleware integration in `withAuth()` with `skipCsrf` option
+  - ✅ CsrfContext for client-side token management
+  - ✅ Timing-safe comparison to prevent timing attacks
+  - ✅ 24-hour token expiry with auto-refresh
+
+- [x] **Proactive Session Refresh** - Better UX
+  - ✅ Check if token expires within 5 minutes
+  - ✅ Refresh proactively to avoid failed requests
+  - ✅ Implemented in AuthContext with interval-based checking
+  - ✅ Prevents failed API calls due to expired tokens
 
 ---
 

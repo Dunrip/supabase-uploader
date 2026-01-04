@@ -92,6 +92,22 @@ SUPABASE-UPLOADER/
 - **FilesTab.js**: Reduced from ~360 lines to ~310 lines (removed duplicate upload logic)
 - **Total reduction**: ~100 lines of duplicate code eliminated
 
+## Mobile Responsiveness
+
+### FilesTab.js Mobile Optimizations
+- **Responsive Layouts**: `flex-col` on mobile, `flex-row sm:` on desktop
+- **Touch Targets**: 44px minimum height/width (iOS/Android guidelines)
+- **Condensed Text**: Shorter button labels on mobile ("Folder" vs "New Folder")
+- **Full-Width Controls**: Inputs and selects expand to fill mobile screens
+- **Responsive Spacing**: Tighter gaps on mobile (`gap-2` vs `gap-3`)
+- **Adaptive Text**: Smaller text on mobile (`text-xs sm:text-sm`)
+- **Icon-Only Buttons**: Hide labels on mobile with `hidden sm:inline`
+
+### Key Breakpoints
+- Default (mobile): Stack layouts, condensed UI
+- `sm:` (640px+): Row layouts, full button text
+- `lg:` (1024px+): Wider search, more spacing
+
 ## Next Steps (Optional)
 
 - Add unit tests for utility functions

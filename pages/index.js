@@ -136,16 +136,16 @@ export default function Home() {
             </p>
             {/* Status Badge */}
             {isConfigured && stats && (
-              <div className="inline-flex items-center gap-3 mt-4 px-4 py-2 bg-dark-surface/50 border border-dark-border rounded-full text-sm">
+              <div className="inline-flex flex-wrap items-center justify-center gap-2 sm:gap-3 mt-4 px-3 sm:px-4 py-2 bg-dark-surface/50 border border-dark-border rounded-full text-xs sm:text-sm">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                   <span className="text-green-400">Connected</span>
                 </span>
-                <span className="w-px h-4 bg-dark-border"></span>
+                <span className="w-px h-4 bg-dark-border hidden sm:block"></span>
                 <span className="text-dark-textMuted">
                   {stats.buckets} bucket{stats.buckets !== 1 ? 's' : ''}
                 </span>
-                <span className="w-px h-4 bg-dark-border"></span>
+                <span className="w-px h-4 bg-dark-border hidden sm:block"></span>
                 <span className="text-dark-textMuted">
                   {stats.responseTime}ms
                 </span>
@@ -153,17 +153,17 @@ export default function Home() {
             )}
             {/* Setup Required Banner - only show after settings have loaded */}
             {!settingsLoading && !isConfigured && (
-              <div className="inline-flex items-center gap-3 mt-4 px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-full text-sm">
+              <div className="inline-flex flex-wrap items-center justify-center gap-2 sm:gap-3 mt-4 px-3 sm:px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-full text-xs sm:text-sm">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
                   <span className="text-yellow-400">Setup Required</span>
                 </span>
-                <span className="w-px h-4 bg-yellow-500/30"></span>
+                <span className="w-px h-4 bg-yellow-500/30 hidden sm:block"></span>
                 <button
                   onClick={() => setShowSettings(true)}
                   className="text-yellow-400 hover:text-yellow-300 underline"
                 >
-                  Configure Supabase
+                  Configure
                 </button>
               </div>
             )}
@@ -178,7 +178,7 @@ export default function Home() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`group flex-1 px-3 sm:px-6 py-3 sm:py-4 font-semibold rounded-lg sm:rounded-xl transition-all duration-300 relative overflow-hidden ${activeTab === tab.id
+                    className={`group flex-1 px-2 sm:px-6 py-3 sm:py-4 font-semibold rounded-lg sm:rounded-xl transition-all duration-300 relative overflow-hidden min-h-[48px] ${activeTab === tab.id
                       ? 'bg-gradient-to-r from-dark-accent to-purple-600 text-white shadow-lg shadow-dark-accent/30'
                       : 'text-dark-textMuted hover:text-dark-text hover:bg-dark-surfaceHover'
                       }`}
@@ -187,11 +187,11 @@ export default function Home() {
                     {/* Hover effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-dark-accent/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity" />
 
-                    <span className="relative flex items-center justify-center gap-2">
+                    <span className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2">
                       <span className={`text-lg sm:text-xl transition-transform ${activeTab === tab.id ? 'scale-110' : 'group-hover:scale-110'}`}>
                         {tab.icon}
                       </span>
-                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span className="text-[10px] sm:text-base">{tab.label}</span>
                     </span>
 
                     {/* Active indicator */}
@@ -249,13 +249,13 @@ export default function Home() {
 
           {/* Footer */}
           <div className={`text-center mt-6 sm:mt-8 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-dark-surface/30 rounded-full text-dark-textMuted text-sm">
+            <div className="inline-flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-dark-surface/30 rounded-full text-dark-textMuted text-xs sm:text-sm">
               <span>Built with</span>
               <span className="text-dark-text font-medium">Next.js</span>
-              <span>&</span>
-              <span className="text-dark-text font-medium">Tailwind CSS</span>
-              <span className="w-px h-4 bg-dark-border"></span>
-              <span>Powered by</span>
+              <span className="hidden sm:inline">&</span>
+              <span className="text-dark-text font-medium hidden sm:inline">Tailwind</span>
+              <span className="w-px h-4 bg-dark-border hidden sm:block"></span>
+              <span className="hidden sm:inline">Powered by</span>
               <span className="text-green-400 font-medium">Supabase</span>
             </div>
           </div>

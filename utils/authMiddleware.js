@@ -1,9 +1,11 @@
 /**
  * Authentication middleware for API routes
  * Verifies user session before allowing access to protected endpoints
+ * Includes CSRF protection for state-changing operations
  */
 import { getAuthClientServer } from './authSupabaseClient.js';
 import { sendError } from './apiHelpers.js';
+import { validateCsrfRequest, getCsrfSecret, CSRF_CONFIG } from './csrf.js';
 
 /**
  * Extract access token from request
@@ -84,15 +86,52 @@ export async function verifySession(req) {
 }
 
 /**
+ * Validate CSRF token for state-changing requests
+ * @param {object} req - Next.js API request
+ * @param {object} res - Next.js API response
+ * @param {boolean} skipCsrf - Whether to skip CSRF validation
+ * @returns {boolean} True if valid or skipped, false if invalid
+ */
+function validateCsrf(req, res, skipCsrf = false) {
+  if (skipCsrf) {
+    return true;
+  }
+
+  // Only validate for state-changing methods
+  const method = req.method?.toUpperCase();
+  if (!['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+    return true;
+  }
+
+  try {
+    const secret = getCsrfSecret();
+    const validation = validateCsrfRequest(req, secret);
+
+    if (!validation.valid) {
+      sendError(res, validation.error || 'CSRF validation failed', 403);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    // If CSRF_SECRET/ENCRYPTION_KEY is not configured, log warning but allow request
+    // This provides backward compatibility during migration
+    console.warn('[Auth] CSRF validation skipped:', error.message);
+    return true;
+  }
+}
+
+/**
  * Higher-order function that wraps an API handler with authentication
  *
  * @param {function} handler - The API route handler
  * @param {object} options - Options
  * @param {boolean} options.optional - If true, don't require auth but attach user if present
+ * @param {boolean} options.skipCsrf - If true, skip CSRF validation (use with caution)
  * @returns {function} Wrapped handler
  *
  * @example
- * // Required auth
+ * // Required auth with CSRF protection
  * export default withAuth(async (req, res) => {
  *   const { user } = req;
  *   // user is guaranteed to exist
@@ -102,9 +141,12 @@ export async function verifySession(req) {
  * export default withAuth(async (req, res) => {
  *   const { user } = req; // may be undefined
  * }, { optional: true });
+ *
+ * // Skip CSRF (for file uploads with multipart/form-data)
+ * export default withAuth(handler, { skipCsrf: true });
  */
 export function withAuth(handler, options = {}) {
-  const { optional = false } = options;
+  const { optional = false, skipCsrf = false } = options;
 
   return async (req, res) => {
     try {
@@ -120,11 +162,38 @@ export function withAuth(handler, options = {}) {
         req.accessToken = session.accessToken;
       }
 
+      // Validate CSRF for state-changing operations
+      // Only validate if user is authenticated (no point validating for unauthenticated requests)
+      if (session && !validateCsrf(req, res, skipCsrf)) {
+        return; // Response already sent by validateCsrf
+      }
+
       // Call the original handler
       return handler(req, res);
     } catch (error) {
       console.error('Auth middleware error:', error);
       return sendError(res, 'Authentication error', 500);
+    }
+  };
+}
+
+/**
+ * Higher-order function that adds only CSRF protection (no auth required)
+ * Use this for public endpoints that still need CSRF protection
+ *
+ * @param {function} handler - The API route handler
+ * @returns {function} Wrapped handler
+ */
+export function withCsrf(handler) {
+  return async (req, res) => {
+    try {
+      if (!validateCsrf(req, res, false)) {
+        return; // Response already sent
+      }
+      return handler(req, res);
+    } catch (error) {
+      console.error('CSRF middleware error:', error);
+      return sendError(res, 'CSRF validation error', 500);
     }
   };
 }

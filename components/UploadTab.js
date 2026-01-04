@@ -276,16 +276,16 @@ export default function UploadTab() {
         />
       )}
 
-      <div className="space-y-6 animate-fade-in">
+      <div className="space-y-4 sm:space-y-6 animate-fade-in">
         {/* Bucket Selector with Stats */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
           {buckets.length > 0 && (
-            <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-dark-textMuted">Upload to:</label>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <label className="text-xs sm:text-sm font-medium text-dark-textMuted">Upload to:</label>
               <select
                 value={currentBucket}
                 onChange={(e) => setCurrentBucket(e.target.value)}
-                className="px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text focus:outline-none focus:ring-2 focus:ring-dark-accent focus:border-transparent"
+                className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text text-sm focus:outline-none focus:ring-2 focus:ring-dark-accent focus:border-transparent min-h-[44px]"
               >
                 {buckets.map(bucket => (
                   <option key={bucket.name} value={bucket.name}>
@@ -298,20 +298,20 @@ export default function UploadTab() {
 
           {/* Quick Stats */}
           {files.length > 0 && (
-            <div className="flex items-center gap-3 text-sm">
+            <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm flex-wrap">
               {stats.uploading > 0 && (
-                <span className="px-3 py-1.5 bg-dark-accent/20 text-dark-accent rounded-full font-medium flex items-center gap-1.5">
-                  <span className="animate-spin">⏳</span> {stats.uploading} uploading
+                <span className="px-2 sm:px-3 py-1.5 bg-dark-accent/20 text-dark-accent rounded-full font-medium flex items-center gap-1.5">
+                  <span className="animate-spin">⏳</span> {stats.uploading}
                 </span>
               )}
               {stats.completed > 0 && (
-                <span className="px-3 py-1.5 bg-green-500/20 text-green-400 rounded-full font-medium">
-                  ✅ {stats.completed} completed
+                <span className="px-2 sm:px-3 py-1.5 bg-green-500/20 text-green-400 rounded-full font-medium">
+                  ✅ {stats.completed}
                 </span>
               )}
               {stats.failed > 0 && (
-                <span className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-full font-medium">
-                  ❌ {stats.failed} failed
+                <span className="px-2 sm:px-3 py-1.5 bg-red-500/20 text-red-400 rounded-full font-medium">
+                  ❌ {stats.failed}
                 </span>
               )}
             </div>
@@ -320,7 +320,7 @@ export default function UploadTab() {
 
         {/* Upload Zone */}
         <div
-          className={`relative border-2 border-dashed rounded-2xl p-12 sm:p-16 text-center cursor-pointer transition-all duration-300 ${isDragging
+          className={`relative border-2 border-dashed rounded-2xl p-8 sm:p-12 md:p-16 text-center cursor-pointer transition-all duration-300 ${isDragging
             ? 'border-dark-accent bg-dark-accent/10 scale-[1.02] shadow-lg shadow-dark-accent/20'
             : 'border-dark-border bg-dark-surface/50 hover:border-dark-accent/50 hover:bg-dark-surface'
             }`}
@@ -331,20 +331,20 @@ export default function UploadTab() {
         >
           <div className={`absolute inset-0 bg-gradient-to-br from-dark-accent/5 to-purple-600/5 rounded-2xl transition-opacity ${isDragging ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`} />
           <div className="relative z-10">
-            <div className={`text-7xl mb-6 transition-transform ${isDragging ? 'scale-110 animate-bounce' : 'animate-pulse-slow'}`} style={{ animationDuration: isDragging ? '0.5s' : '3s' }}>
+            <div className={`text-5xl sm:text-7xl mb-4 sm:mb-6 transition-transform ${isDragging ? 'scale-110 animate-bounce' : 'animate-pulse-slow'}`} style={{ animationDuration: isDragging ? '0.5s' : '3s' }}>
               {isDragging ? '📥' : '☁️'}
             </div>
-            <h2 className="text-2xl font-bold text-dark-text mb-3">
-              {isDragging ? 'Drop files here!' : 'Drag & Drop Files Here'}
+            <h2 className="text-xl sm:text-2xl font-bold text-dark-text mb-2 sm:mb-3">
+              {isDragging ? 'Drop files here!' : 'Drag & Drop Files'}
             </h2>
-            <p className="text-dark-textMuted mb-6">or click to browse from your device</p>
-            <button className="px-8 py-3 bg-gradient-to-r from-dark-accent to-purple-600 text-white rounded-xl font-semibold hover:from-dark-accentHover hover:to-purple-500 transition-all transform hover:scale-105 shadow-lg shadow-dark-accent/30">
+            <p className="text-dark-textMuted mb-4 sm:mb-6 text-sm sm:text-base">or tap to browse</p>
+            <button className="px-6 sm:px-8 py-3 bg-gradient-to-r from-dark-accent to-purple-600 text-white rounded-xl font-semibold hover:from-dark-accentHover hover:to-purple-500 transition-all shadow-lg shadow-dark-accent/30 min-h-[48px] text-sm sm:text-base">
               Browse Files
             </button>
-            <p className="text-xs text-dark-textMuted mt-4 flex items-center justify-center gap-2">
+            <p className="text-[10px] sm:text-xs text-dark-textMuted mt-3 sm:mt-4 flex flex-wrap items-center justify-center gap-2">
               <span>📁 Multiple files</span>
               <span className="w-1 h-1 rounded-full bg-dark-textMuted"></span>
-              <span>📦 Max 100MB each</span>
+              <span>📦 Max 100MB</span>
             </p>
           </div>
           <input
@@ -359,8 +359,8 @@ export default function UploadTab() {
         {/* Upload Progress List */}
         {files.length > 0 && (
           <div className="space-y-3 animate-slide-up">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-dark-text flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <h3 className="text-base sm:text-lg font-semibold text-dark-text flex items-center gap-2">
                 Upload Queue
                 <span className="px-2 py-0.5 bg-dark-border rounded-full text-xs text-dark-textMuted font-normal">
                   {files.length}
@@ -370,14 +370,14 @@ export default function UploadTab() {
                 {(stats.completed > 0 || stats.failed > 0) && (
                   <button
                     onClick={clearCompleted}
-                    className="px-3 py-1.5 text-sm bg-dark-surface border border-dark-border rounded-lg text-dark-textMuted hover:text-dark-text hover:bg-dark-surfaceHover hover:border-dark-accent/50 transition-all"
+                    className="flex-1 sm:flex-none px-3 py-2 text-xs sm:text-sm bg-dark-surface border border-dark-border rounded-lg text-dark-textMuted hover:text-dark-text hover:bg-dark-surfaceHover hover:border-dark-accent/50 transition-all min-h-[40px]"
                   >
-                    Clear Completed
+                    Clear Done
                   </button>
                 )}
                 <button
                   onClick={() => setFiles([])}
-                  className="px-3 py-1.5 text-sm bg-dark-surface border border-dark-border rounded-lg text-dark-textMuted hover:text-dark-text hover:bg-dark-surfaceHover hover:border-dark-accent/50 transition-all"
+                  className="flex-1 sm:flex-none px-3 py-2 text-xs sm:text-sm bg-dark-surface border border-dark-border rounded-lg text-dark-textMuted hover:text-dark-text hover:bg-dark-surfaceHover hover:border-dark-accent/50 transition-all min-h-[40px]"
                 >
                   Clear All
                 </button>
@@ -387,7 +387,7 @@ export default function UploadTab() {
             {files.map((file, index) => (
               <div
                 key={file.id}
-                className={`bg-dark-surface border rounded-xl p-4 transition-all animate-slide-up ${file.status === 'success'
+                className={`bg-dark-surface border rounded-xl p-3 sm:p-4 transition-all animate-slide-up ${file.status === 'success'
                   ? 'border-green-500/30 bg-green-500/5'
                   : file.status === 'error'
                     ? 'border-red-500/30 bg-red-500/5'
@@ -395,12 +395,12 @@ export default function UploadTab() {
                   }`}
                 style={{ animationDelay: `${index * 50}ms` }}
               >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="text-2xl flex-shrink-0">{getFileIcon(file.name)}</div>
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                    <div className="text-xl sm:text-2xl flex-shrink-0">{getFileIcon(file.name)}</div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-dark-text truncate">{file.name}</div>
-                      <div className="text-xs text-dark-textMuted mt-0.5 flex items-center gap-2">
+                      <div className="font-medium text-dark-text truncate text-sm sm:text-base">{file.name}</div>
+                      <div className="text-[10px] sm:text-xs text-dark-textMuted mt-0.5 flex items-center gap-1.5 sm:gap-2 flex-wrap">
                         <span>{formatFileSize(file.size)}</span>
                         {file.status === 'uploading' && file.progress > 0 && (
                           <>
@@ -411,30 +411,30 @@ export default function UploadTab() {
                         {file.status === 'success' && file.endTime && file.startTime && (
                           <>
                             <span className="w-1 h-1 rounded-full bg-dark-textMuted"></span>
-                            <span className="text-green-400">Completed in {((file.endTime - file.startTime) / 1000).toFixed(1)}s</span>
+                            <span className="text-green-400">{((file.endTime - file.startTime) / 1000).toFixed(1)}s</span>
                           </>
                         )}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 ml-4">
+                  <div className="flex items-center gap-1 sm:gap-2 ml-2 sm:ml-4">
                     {file.status === 'uploading' && (
                       <div className="w-8 h-8 flex items-center justify-center">
-                        <div className="animate-spin text-xl">⏳</div>
+                        <div className="animate-spin text-lg sm:text-xl">⏳</div>
                       </div>
                     )}
                     {file.status === 'success' && (
-                      <div className="w-8 h-8 flex items-center justify-center text-xl animate-bounce" style={{ animationDuration: '0.5s', animationIterationCount: '2' }}>
+                      <div className="w-8 h-8 flex items-center justify-center text-lg sm:text-xl animate-bounce" style={{ animationDuration: '0.5s', animationIterationCount: '2' }}>
                         ✅
                       </div>
                     )}
                     {file.status === 'error' && (
-                      <div className="w-8 h-8 flex items-center justify-center text-xl">❌</div>
+                      <div className="w-8 h-8 flex items-center justify-center text-lg sm:text-xl">❌</div>
                     )}
                     {file.status !== 'uploading' && (
                       <button
                         onClick={() => removeFile(file.id)}
-                        className="w-8 h-8 flex items-center justify-center text-dark-textMuted hover:text-dark-text hover:bg-dark-surfaceHover rounded-lg transition-all"
+                        className="w-10 h-10 flex items-center justify-center text-dark-textMuted hover:text-dark-text hover:bg-dark-surfaceHover rounded-lg transition-all"
                         title="Remove from list"
                       >
                         ✕
