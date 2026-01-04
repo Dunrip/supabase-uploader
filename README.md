@@ -2,9 +2,9 @@
 
 # 📦 Supabase File Manager
 
-**The complete platform for managing files in Supabase Storage**
+**Multi-user file management platform for Supabase Storage**
 
-Build, manage, and organize your files with a beautiful dark-themed web interface. Upload, preview, download, and delete files effortlessly across multiple buckets.
+A beautiful dark-themed web interface for managing files in Supabase Storage. Each user can connect their own Supabase project with encrypted credential storage.
 
 ---
 
@@ -13,15 +13,14 @@ Build, manage, and organize your files with a beautiful dark-themed web interfac
 ## 📑 Table of Contents
 
 - [Features](#-features)
+- [Architecture](#-architecture)
 - [Quick Start](#-quick-start)
+  - [Prerequisites](#prerequisites)
   - [Installation](#1-installation)
-  - [Configure Environment](#2-configure-environment)
-  - [Create Storage Bucket](#3-create-storage-bucket)
+  - [Set Up Auth Project](#2-set-up-auth-project)
+  - [Configure Environment](#3-configure-environment)
   - [Run the Application](#4-run-the-application)
 - [Web Interface Guide](#-web-interface-guide)
-  - [Upload Tab](#upload-tab)
-  - [Files Tab](#files-tab)
-  - [Logs Tab](#logs-tab)
 - [CLI Usage](#-cli-usage)
 - [Using as a Module](#-using-as-a-module)
 - [Configuration](#-configuration)
@@ -34,16 +33,38 @@ Build, manage, and organize your files with a beautiful dark-themed web interfac
 
 ## ✨ Features
 
-- 🌐 **Web Interface** - Beautiful, responsive dark-themed UI
-- 📤 **Upload Files** - Drag & drop or browse, with progress tracking
-- 📋 **File Management** - List, preview, download, and delete files
-- 🔍 **Search** - Quickly find files by name
-- 📦 **Multi-Bucket Support** - Switch between buckets easily
+- 🔐 **Multi-User Authentication** - Email/password auth with secure session management
+- 🌐 **Per-User Supabase Connection** - Each user connects their own Supabase project
+- 🔒 **Encrypted API Keys** - User credentials encrypted with AES-256-GCM at rest
+- 📤 **Upload Files** - Drag & drop with progress tracking and folder support
+- 📋 **File Management** - List, preview, download, rename, and delete files
+- 📁 **Folder Organization** - Create folders, move files, breadcrumb navigation
+- 🔍 **Search & Filter** - Find files by name, filter by type, sort by date/size/name
+- ✅ **Bulk Operations** - Select multiple files for download (ZIP) or delete
 - 📄 **File Preview** - Preview images, videos, PDFs, and audio files
 - 📊 **Activity Logs** - View application logs in real-time
 - ⚙️ **CLI Tool** - Command-line interface for automation
 
+## 🏗️ Architecture
+
+This application uses a **two-project architecture**:
+
+1. **Auth Project** - A central Supabase project for:
+   - User authentication (login, register, sessions)
+   - Storing user settings and encrypted API keys
+   
+2. **User's Storage Project** - Each user's own Supabase project for:
+   - File storage (buckets and files)
+   - User configures this via Settings after login
+
+This design allows multiple users to manage their own independent Supabase storage projects through a single application.
+
 ## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 18+
+- Two Supabase projects (one for auth, one for storage)
 
 ### 1. Installation
 
@@ -51,29 +72,28 @@ Build, manage, and organize your files with a beautiful dark-themed web interfac
 npm install
 ```
 
-### 2. Configure Environment
+### 2. Set Up Auth Project
 
-Copy `.env.example` to `.env` and add your Supabase credentials:
+Create a Supabase project for authentication:
+
+1. Go to [Supabase Dashboard](https://app.supabase.com) and create a new project
+2. Go to **SQL Editor** and run the migration in `database/user_settings.sql`
+3. Note your project URL and keys from **Settings** → **API**
+
+### 3. Configure Environment
+
+Copy `env.example` to `.env` and configure:
 
 ```env
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_KEY=your-service-role-key
-SUPABASE_BUCKET=files
+# Auth Supabase (required)
+NEXT_PUBLIC_AUTH_SUPABASE_URL=https://your-auth-project.supabase.co
+NEXT_PUBLIC_AUTH_SUPABASE_ANON_KEY=your-anon-key
+AUTH_SUPABASE_SERVICE_KEY=your-service-role-key
+
+# Encryption key (required) - generate with:
+# node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ENCRYPTION_KEY=your-64-character-hex-key
 ```
-
-**Getting Your Credentials:**
-1. Go to [Supabase Dashboard](https://app.supabase.com)
-2. Select your project → **Settings** → **API**
-3. Copy **Project URL** → `SUPABASE_URL`
-4. Copy **service_role** key → `SUPABASE_KEY`
-
-⚠️ **Important:** Use the `service_role` key (not `anon` key) for server-side operations.
-
-### 3. Create Storage Bucket
-
-1. In Supabase Dashboard → **Storage**
-2. Click **New bucket**
-3. Enter bucket name and choose visibility (Public/Private)
 
 ### 4. Run the Application
 
@@ -90,7 +110,26 @@ npm run build
 npm start
 ```
 
+### 5. First-Time Setup
+
+1. Register an account at `/login`
+2. Click the Settings icon (⚙️) in the header
+3. Enter your storage Supabase project URL and service role key
+4. Click "Test Connection" to verify
+5. Save settings and start managing files!
+
 ## 🌐 Web Interface Guide
+
+### Login / Register
+
+- Create an account with email and password
+- Sessions are managed automatically with secure cookies
+
+### Settings Modal
+
+- Configure your Supabase storage project
+- Test connection before saving
+- API keys are encrypted before storage
 
 ### Upload Tab
 
@@ -102,29 +141,28 @@ npm start
 
 ### Files Tab
 
-- **Browse files** in your buckets
+- **Browse files** in your buckets with folder navigation
 - **Search** files by name
+- **Filter** by file type (images, videos, documents, etc.)
+- **Sort** by date, size, or name
 - **Preview** images, videos, PDFs, and audio files
-- **Download** files directly
-- **Delete** files with confirmation
-- **Upload** files directly from this tab
+- **Rename** files inline
+- **Move** files between folders
+- **Bulk select** for download or delete
 
 ### Logs Tab
 
 - View application activity logs
 - **Auto-refresh** option (every 5 seconds)
 - Color-coded log levels (INFO, SUCCESS, ERROR)
-- View last 50 log entries
 
 ## ⚙️ CLI Usage
 
-The CLI tool (`uploadToSupabase.js`) is available for automation:
+The CLI tool (`uploadToSupabase.js`) uses environment variables for credentials:
 
 ```bash
 # Interactive mode
 npm run cli
-# or
-node uploadToSupabase.js
 
 # Upload a file
 node uploadToSupabase.js ./file.pdf documents
@@ -139,11 +177,9 @@ node uploadToSupabase.js --download path/to/file.pdf documents
 node uploadToSupabase.js --delete path/to/file.pdf documents
 ```
 
-For more CLI options, run `node uploadToSupabase.js --help`
+For CLI usage, set `SUPABASE_URL` and `SUPABASE_KEY` in your `.env` file.
 
 ## 📦 Using as a Module
-
-Import functions in your own scripts:
 
 ```javascript
 const { 
@@ -153,59 +189,68 @@ const {
   deleteFile
 } = require('./uploadToSupabase');
 
-// Upload a file
 await uploadFile('./document.pdf', 'documents', 'myfolder/document.pdf');
-
-// List files
 await listFiles('documents', 'myfolder');
 ```
 
 ## ⚙️ Configuration
 
-Optional environment variables in `.env`:
+See `env.example` for all configuration options:
 
 ```env
-# Default bucket name (optional, defaults to 'files')
+# Auth configuration (required)
+NEXT_PUBLIC_AUTH_SUPABASE_URL=...
+NEXT_PUBLIC_AUTH_SUPABASE_ANON_KEY=...
+AUTH_SUPABASE_SERVICE_KEY=...
+ENCRYPTION_KEY=...
+
+# Legacy/CLI configuration (optional)
+SUPABASE_URL=...
+SUPABASE_KEY=...
 SUPABASE_BUCKET=files
-
-# Maximum retry attempts (optional, defaults to 3)
 MAX_RETRIES=3
-
-# Log file path (optional, defaults to 'supabase-uploader.log')
 LOG_FILE=supabase-uploader.log
-
-# Enable file logging (optional, defaults to 'true')
 ENABLE_LOGGING=true
 ```
 
 ## 🔧 Troubleshooting
 
-**"Missing required environment variables"**
-- Ensure `.env` exists with `SUPABASE_URL` and `SUPABASE_KEY`
+**"Authentication required"**
+- Log in at `/login` first
+- Check that auth environment variables are configured
+
+**"Supabase storage is not configured"**
+- Open Settings and configure your Supabase project credentials
+
+**"Connection failed"**
+- Verify Supabase URL format: `https://your-project.supabase.co`
+- Use `service_role` key (not `anon` key) for storage operations
 
 **"Bucket not found"**
-- Create the bucket in Supabase Dashboard first
-- Verify bucket name matches exactly
-
-**"Permission denied"**
-- Use `service_role` key (not `anon` key)
-- Check bucket policies in Supabase Dashboard
+- Create the bucket in your storage Supabase project first
 
 **Port already in use**
 - Change port: `PORT=3001 npm run dev`
 
 ## 🔒 Security
 
-- ✅ `.env` file is in `.gitignore` (never commit it)
-- ✅ Use `service_role` key only on server-side
-- ✅ Set appropriate bucket policies for sensitive files
-- ✅ Rotate keys regularly
+- ✅ **Encrypted API Keys** - User credentials encrypted with AES-256-GCM
+- ✅ **JWT Authentication** - Secure session tokens with auto-refresh
+- ✅ **Row Level Security** - Users can only access their own settings
+- ✅ **Rate Limiting** - API abuse prevention with configurable limits
+- ✅ **Path Traversal Protection** - Blocks malicious file paths
+- ✅ **File Type Validation** - Magic byte verification, blocked executables
+- ✅ **Security Headers** - CSP, X-Frame-Options, and more
+
+See `SECURITY.md` for detailed security documentation.
 
 ## 🛠️ Tech Stack
 
 - **Frontend:** Next.js 14, React 18, Tailwind CSS
 - **Backend:** Next.js API Routes
-- **Storage:** Supabase Storage
+- **Auth:** Supabase Auth
+- **Storage:** Supabase Storage (user-configured)
+- **Encryption:** Node.js crypto (AES-256-GCM)
 - **CLI:** Node.js with inquirer
 
 ## 📄 License

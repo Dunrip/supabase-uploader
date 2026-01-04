@@ -1,14 +1,21 @@
-import { listFiles, deleteFile } from '../../uploadToSupabase';
+import { listFiles, deleteFile } from '../../utils/storageOperations.js';
 import { formatFileSize } from '../../utils/clientHelpers';
-import { getDefaultBucket } from '../../utils/serverHelpers';
 import { validateMethod, validateQueryParams, sendSuccess, sendError } from '../../utils/apiHelpers';
 import { validateStoragePath, validateBucketName } from '../../utils/security';
+import { withAuth } from '../../utils/authMiddleware.js';
+import { createStorageClientWithErrorHandling } from '../../utils/storageClientFactory.js';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
+  // Get user's storage client
+  const storageResult = await createStorageClientWithErrorHandling(req, res);
+  if (!storageResult) return; // Error already sent
+
+  const { client: supabase, settings } = storageResult;
+
   if (req.method === 'GET') {
     try {
       // Validate bucket name
-      const bucketName = req.query.bucket || getDefaultBucket();
+      const bucketName = req.query.bucket || settings.default_bucket || 'files';
       const bucketValidation = validateBucketName(bucketName);
       if (!bucketValidation.valid) {
         return sendError(res, bucketValidation.error, 400);
@@ -24,7 +31,7 @@ export default async function handler(req, res) {
         folderPath = pathValidation.sanitized;
       }
 
-      const items = await listFiles(bucketName, folderPath);
+      const items = await listFiles(supabase, bucketName, folderPath);
 
       // Separate folders and files
       const folders = [];
@@ -79,16 +86,16 @@ export default async function handler(req, res) {
       const storagePath = pathValidation.sanitized;
 
       // Validate bucket name
-      const bucketName = req.query.bucket || getDefaultBucket();
+      const bucketName = req.query.bucket || settings.default_bucket || 'files';
       const bucketValidation = validateBucketName(bucketName);
       if (!bucketValidation.valid) {
         return sendError(res, bucketValidation.error, 400);
       }
 
-      const success = await deleteFile(storagePath, bucketName);
+      await deleteFile(supabase, storagePath, bucketName, settings.max_retries);
 
       sendSuccess(res, {
-        message: success ? 'File deleted successfully' : 'Failed to delete file',
+        message: 'File deleted successfully',
       });
     } catch (error) {
       console.error('Delete error:', error);
@@ -98,3 +105,5 @@ export default async function handler(req, res) {
     validateMethod(req, res, ['GET', 'DELETE']);
   }
 }
+
+export default withAuth(handler);

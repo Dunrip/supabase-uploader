@@ -3,8 +3,10 @@ import { formatFileSize, getFileIcon } from '../utils/clientHelpers';
 import { loadBucketsFromApi } from '../utils/bucketHelpers';
 import { uploadFileWithProgress } from '../utils/uploadHelpers';
 import Toast from './Toast';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function UploadTab() {
+  const { authFetch, session } = useAuth();
   const [files, setFiles] = useState([]);
   const [currentBucket, setCurrentBucket] = useState('files');
   const [buckets, setBuckets] = useState([]);
@@ -17,7 +19,7 @@ export default function UploadTab() {
   }, []);
 
   const loadBuckets = async () => {
-    const { buckets: loadedBuckets, preferredBucket } = await loadBucketsFromApi();
+    const { buckets: loadedBuckets, preferredBucket } = await loadBucketsFromApi(authFetch);
     if (loadedBuckets.length > 0) {
       setBuckets(loadedBuckets);
       if (preferredBucket) {
@@ -38,12 +40,78 @@ export default function UploadTab() {
     setIsDragging(false);
   };
 
-  const handleDrop = (e) => {
+  // Recursively read entries from a directory
+  const readDirectory = async (directoryEntry, basePath = '') => {
+    const files = [];
+    const reader = directoryEntry.createReader();
+
+    const readEntries = () => new Promise((resolve, reject) => {
+      reader.readEntries(resolve, reject);
+    });
+
+    // Keep reading until no more entries (readEntries returns batches)
+    let entries = await readEntries();
+    while (entries.length > 0) {
+      for (const entry of entries) {
+        if (entry.isFile) {
+          // Get file and add path info
+          const file = await new Promise((resolve, reject) => {
+            entry.file(resolve, reject);
+          });
+          // Create a new File object with the relative path
+          const relativePath = basePath ? `${basePath}/${file.name}` : file.name;
+          files.push({ file, relativePath });
+        } else if (entry.isDirectory) {
+          // Recursively read subdirectory
+          const subPath = basePath ? `${basePath}/${entry.name}` : entry.name;
+          const subFiles = await readDirectory(entry, subPath);
+          files.push(...subFiles);
+        }
+      }
+      entries = await readEntries();
+    }
+
+    return files;
+  };
+
+  const handleDrop = async (e) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    handleFiles(droppedFiles);
+
+    const items = e.dataTransfer.items;
+    const allFiles = [];
+
+    // Use DataTransfer API to handle both files and folders
+    if (items && items.length > 0) {
+      const entries = [];
+      for (let i = 0; i < items.length; i++) {
+        const entry = items[i].webkitGetAsEntry?.();
+        if (entry) {
+          entries.push(entry);
+        }
+      }
+
+      // Process each entry (file or directory)
+      for (const entry of entries) {
+        if (entry.isFile) {
+          const file = await new Promise((resolve, reject) => {
+            entry.file(resolve, reject);
+          });
+          allFiles.push({ file, relativePath: file.name });
+        } else if (entry.isDirectory) {
+          const dirFiles = await readDirectory(entry, entry.name);
+          allFiles.push(...dirFiles);
+        }
+      }
+
+      // Upload all files with their paths
+      handleFilesWithPaths(allFiles);
+    } else {
+      // Fallback for browsers without webkitGetAsEntry
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      handleFiles(droppedFiles);
+    }
   };
 
   const handleFileSelect = (e) => {
@@ -52,8 +120,28 @@ export default function UploadTab() {
     e.target.value = '';
   };
 
+  // Handle files with relative paths (from folder drops)
+  const handleFilesWithPaths = (fileEntries) => {
+    fileEntries.forEach(({ file, relativePath }) => {
+      // Skip empty/directory entries
+      if (file.size === 0 && file.type === '') {
+        console.log('Skipping directory entry:', relativePath);
+        return;
+      }
+      uploadFileWithPath(file, relativePath);
+    });
+  };
+
+  // Handle regular files (from file picker)
   const handleFiles = (fileList) => {
-    fileList.forEach(file => uploadFile(file));
+    fileList.forEach(file => {
+      // Skip directories (they have size 0 and no type)
+      if (file.size === 0 && file.type === '') {
+        console.log('Skipping directory:', file.name);
+        return;
+      }
+      uploadFile(file);
+    });
   };
 
   const uploadFile = (file) => {
@@ -69,6 +157,9 @@ export default function UploadTab() {
     };
 
     setFiles(prev => [...prev, newFile]);
+
+    // Get access token from session
+    const accessToken = session?.access_token || null;
 
     uploadFileWithProgress(
       file,
@@ -96,7 +187,63 @@ export default function UploadTab() {
           message: `Failed to upload ${file.name}: ${errorMsg}`,
           type: 'error',
         });
-      }
+      },
+      '', // No folder path in UploadTab
+      accessToken // Pass access token for authentication
+    );
+  };
+
+  // Upload file with a custom relative path (for folder uploads)
+  const uploadFileWithPath = (file, relativePath) => {
+    const fileId = Date.now() + Math.random();
+    // Extract folder path from relativePath (everything except the filename)
+    const pathParts = relativePath.split('/');
+    const fileName = pathParts.pop();
+    const folderPath = pathParts.join('/');
+
+    const newFile = {
+      id: fileId,
+      name: relativePath, // Show full path in UI
+      size: file.size,
+      status: 'uploading',
+      progress: 0,
+      error: null,
+      startTime: Date.now(),
+    };
+
+    setFiles(prev => [...prev, newFile]);
+
+    // Get access token from session
+    const accessToken = session?.access_token || null;
+
+    uploadFileWithProgress(
+      file,
+      currentBucket,
+      (percent) => {
+        setFiles(prev =>
+          prev.map(f => f.id === fileId ? { ...f, progress: percent } : f)
+        );
+      },
+      (response) => {
+        setFiles(prev =>
+          prev.map(f => f.id === fileId ? { ...f, status: 'success', progress: 100, endTime: Date.now() } : f)
+        );
+        setNotification({
+          message: `${relativePath} uploaded successfully`,
+          type: 'success',
+        });
+      },
+      (errorMsg) => {
+        setFiles(prev =>
+          prev.map(f => f.id === fileId ? { ...f, status: 'error', error: errorMsg, endTime: Date.now() } : f)
+        );
+        setNotification({
+          message: `Failed to upload ${relativePath}: ${errorMsg}`,
+          type: 'error',
+        });
+      },
+      folderPath, // Pass the folder path for proper placement
+      accessToken // Pass access token for authentication
     );
   };
 
@@ -173,11 +320,10 @@ export default function UploadTab() {
 
         {/* Upload Zone */}
         <div
-          className={`relative border-2 border-dashed rounded-2xl p-12 sm:p-16 text-center cursor-pointer transition-all duration-300 ${
-            isDragging
-              ? 'border-dark-accent bg-dark-accent/10 scale-[1.02] shadow-lg shadow-dark-accent/20'
-              : 'border-dark-border bg-dark-surface/50 hover:border-dark-accent/50 hover:bg-dark-surface'
-          }`}
+          className={`relative border-2 border-dashed rounded-2xl p-12 sm:p-16 text-center cursor-pointer transition-all duration-300 ${isDragging
+            ? 'border-dark-accent bg-dark-accent/10 scale-[1.02] shadow-lg shadow-dark-accent/20'
+            : 'border-dark-border bg-dark-surface/50 hover:border-dark-accent/50 hover:bg-dark-surface'
+            }`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -241,13 +387,12 @@ export default function UploadTab() {
             {files.map((file, index) => (
               <div
                 key={file.id}
-                className={`bg-dark-surface border rounded-xl p-4 transition-all animate-slide-up ${
-                  file.status === 'success'
-                    ? 'border-green-500/30 bg-green-500/5'
-                    : file.status === 'error'
+                className={`bg-dark-surface border rounded-xl p-4 transition-all animate-slide-up ${file.status === 'success'
+                  ? 'border-green-500/30 bg-green-500/5'
+                  : file.status === 'error'
                     ? 'border-red-500/30 bg-red-500/5'
                     : 'border-dark-border hover:border-dark-accent/50'
-                }`}
+                  }`}
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 <div className="flex items-center justify-between mb-3">
@@ -301,13 +446,12 @@ export default function UploadTab() {
                 {/* Progress Bar */}
                 <div className="w-full bg-dark-bg rounded-full h-2 overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-300 ${
-                      file.status === 'success'
-                        ? 'bg-gradient-to-r from-green-500 to-emerald-500'
-                        : file.status === 'error'
+                    className={`h-full rounded-full transition-all duration-300 ${file.status === 'success'
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-500'
+                      : file.status === 'error'
                         ? 'bg-gradient-to-r from-red-500 to-rose-500'
                         : 'bg-gradient-to-r from-dark-accent to-purple-600'
-                    }`}
+                      }`}
                     style={{ width: `${file.progress}%` }}
                   />
                 </div>

@@ -1,18 +1,41 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import UploadTab from '../components/UploadTab';
 import FilesTab from '../components/FilesTab';
 import LogsTab from '../components/LogsTab';
+import SettingsModal from '../components/SettingsModal';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Home() {
+  const router = useRouter();
+  const { user, settings, loading, settingsLoading, isConfigured, signOut } = useAuth();
+
   const [activeTab, setActiveTab] = useState('upload');
   const [stats, setStats] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
-    setIsLoaded(true);
-    loadStats();
-  }, []);
+    if (user && isConfigured) {
+      setIsLoaded(true);
+      loadStats();
+    } else if (user) {
+      setIsLoaded(true);
+    }
+  }, [user, isConfigured]);
+
+  const handleLogout = async () => {
+    await signOut();
+    router.push('/login');
+  };
 
   const loadStats = async () => {
     try {
@@ -35,6 +58,20 @@ export default function Home() {
     { id: 'logs', label: 'Logs', icon: '📄', description: 'View activity logs' },
   ];
 
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-dark-accent"></div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated
+  if (!user) {
+    return null;
+  }
+
   return (
     <>
       <Head>
@@ -53,6 +90,39 @@ export default function Home() {
         </div>
 
         <div className="relative z-10 container mx-auto px-4 py-6 sm:py-8 max-w-7xl">
+          {/* User Controls Bar */}
+          <div className={`flex items-center justify-between mb-4 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+            <div className="flex items-center gap-2 text-sm text-dark-textMuted">
+              <span className="w-8 h-8 rounded-full bg-dark-accent/20 flex items-center justify-center text-dark-accent font-medium">
+                {user.email?.charAt(0).toUpperCase()}
+              </span>
+              <span className="hidden sm:inline">{user.email}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowSettings(true)}
+                className="p-2 text-dark-textMuted hover:text-dark-text hover:bg-dark-surface/50 rounded-lg transition-colors"
+                title="Settings"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="p-2 text-dark-textMuted hover:text-red-400 hover:bg-dark-surface/50 rounded-lg transition-colors"
+                title="Sign Out"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
           {/* Header */}
           <div className={`text-center mb-6 sm:mb-8 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
             <div className="inline-flex items-center gap-3 mb-2">
@@ -65,7 +135,7 @@ export default function Home() {
               Professional file management for Supabase Storage
             </p>
             {/* Status Badge */}
-            {stats && (
+            {isConfigured && stats && (
               <div className="inline-flex items-center gap-3 mt-4 px-4 py-2 bg-dark-surface/50 border border-dark-border rounded-full text-sm">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
@@ -81,6 +151,22 @@ export default function Home() {
                 </span>
               </div>
             )}
+            {/* Setup Required Banner - only show after settings have loaded */}
+            {!settingsLoading && !isConfigured && (
+              <div className="inline-flex items-center gap-3 mt-4 px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-full text-sm">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                  <span className="text-yellow-400">Setup Required</span>
+                </span>
+                <span className="w-px h-4 bg-yellow-500/30"></span>
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="text-yellow-400 hover:text-yellow-300 underline"
+                >
+                  Configure Supabase
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Main Card */}
@@ -92,11 +178,10 @@ export default function Home() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`group flex-1 px-3 sm:px-6 py-3 sm:py-4 font-semibold rounded-lg sm:rounded-xl transition-all duration-300 relative overflow-hidden ${
-                      activeTab === tab.id
-                        ? 'bg-gradient-to-r from-dark-accent to-purple-600 text-white shadow-lg shadow-dark-accent/30'
-                        : 'text-dark-textMuted hover:text-dark-text hover:bg-dark-surfaceHover'
-                    }`}
+                    className={`group flex-1 px-3 sm:px-6 py-3 sm:py-4 font-semibold rounded-lg sm:rounded-xl transition-all duration-300 relative overflow-hidden ${activeTab === tab.id
+                      ? 'bg-gradient-to-r from-dark-accent to-purple-600 text-white shadow-lg shadow-dark-accent/30'
+                      : 'text-dark-textMuted hover:text-dark-text hover:bg-dark-surfaceHover'
+                      }`}
                     style={{ transitionDelay: `${index * 50}ms` }}
                   >
                     {/* Hover effect */}
@@ -131,9 +216,33 @@ export default function Home() {
             {/* Tab Content */}
             <div className="p-4 sm:p-6 md:p-8 min-h-0 flex flex-col" style={{ minHeight: '500px' }}>
               <div className="flex-1 min-h-0">
-                {activeTab === 'upload' && <UploadTab />}
-                {activeTab === 'files' && <FilesTab />}
-                {activeTab === 'logs' && <LogsTab />}
+                {settingsLoading ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-dark-accent mb-4"></div>
+                    <p className="text-dark-textMuted">Loading settings...</p>
+                  </div>
+                ) : !isConfigured ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                    <div className="text-6xl mb-4">🔧</div>
+                    <h3 className="text-xl font-semibold text-dark-text mb-2">Setup Required</h3>
+                    <p className="text-dark-textMuted mb-6 max-w-md">
+                      Configure your Supabase project to start managing files.
+                      You&apos;ll need your project URL and service role key.
+                    </p>
+                    <button
+                      onClick={() => setShowSettings(true)}
+                      className="px-6 py-3 bg-dark-accent hover:bg-dark-accent/80 text-white font-medium rounded-lg transition-colors"
+                    >
+                      Configure Supabase
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {activeTab === 'upload' && <UploadTab />}
+                    {activeTab === 'files' && <FilesTab />}
+                    {activeTab === 'logs' && <LogsTab />}
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -159,6 +268,9 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </>
   );
 }

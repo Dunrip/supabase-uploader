@@ -1,12 +1,18 @@
 import path from 'path';
-import { getSupabaseClient } from '../../utils/supabaseClient';
-import { getDefaultBucket } from '../../utils/serverHelpers';
 import { validateMethod, validateQueryParams, sendError } from '../../utils/apiHelpers';
 import { validateStoragePath, validateBucketName } from '../../utils/security';
+import { withAuth } from '../../utils/authMiddleware.js';
+import { createStorageClientWithErrorHandling } from '../../utils/storageClientFactory.js';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (!validateMethod(req, res, 'GET')) return;
   if (!validateQueryParams(req, res, ['path'])) return;
+
+  // Get user's storage client
+  const storageResult = await createStorageClientWithErrorHandling(req, res);
+  if (!storageResult) return;
+
+  const { client: supabase, settings } = storageResult;
 
   // Validate storage path (prevent path traversal)
   const pathValidation = validateStoragePath(req.query.path);
@@ -16,19 +22,32 @@ export default async function handler(req, res) {
   const storagePath = pathValidation.sanitized;
 
   // Validate bucket name
-  const bucketName = req.query.bucket || getDefaultBucket();
+  const bucketName = req.query.bucket || settings.default_bucket || 'files';
   const bucketValidation = validateBucketName(bucketName);
   if (!bucketValidation.valid) {
     return sendError(res, bucketValidation.error, 400);
   }
 
   try {
-    const supabase = getSupabaseClient();
+    console.log('Preview request for path:', storagePath, 'in bucket:', bucketName);
 
     // Try to get the file from storage
-    const { data, error } = await supabase.storage
+    let { data, error } = await supabase.storage
       .from(bucketName)
       .download(storagePath);
+
+    // If file not found and path might be double-encoded, try decoding
+    if (error && error.message?.includes('not found')) {
+      const decodedPath = decodeURIComponent(storagePath);
+      if (decodedPath !== storagePath) {
+        console.log('Trying decoded path:', decodedPath);
+        const retryResult = await supabase.storage
+          .from(bucketName)
+          .download(decodedPath);
+        data = retryResult.data;
+        error = retryResult.error;
+      }
+    }
 
     if (error) {
       console.error('Preview download error:', error);
@@ -93,3 +112,5 @@ export default async function handler(req, res) {
     sendError(res, error.message || 'Failed to preview file', 500);
   }
 }
+
+export default withAuth(handler);

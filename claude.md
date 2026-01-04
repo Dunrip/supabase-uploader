@@ -1,16 +1,30 @@
 # Supabase File Manager
 
-A full-stack file management application built with Next.js and Supabase Storage.
+A multi-user file management application built with Next.js and Supabase Storage. Each user authenticates and configures their own Supabase storage project.
 
 ## Project Overview
 
-This is a web-based file manager that allows uploading, downloading, previewing, and managing files stored in Supabase Storage buckets. It includes both a web UI and a CLI tool.
+This is a web-based file manager that allows uploading, downloading, previewing, and managing files stored in Supabase Storage buckets. It features user authentication, encrypted credential storage, and per-user Supabase project configuration.
+
+## Architecture
+
+**Two-Project Design:**
+1. **Auth Project** - Central Supabase project for authentication and storing user settings
+2. **User's Storage Project** - Each user connects their own Supabase project for file storage
+
+**Key Concepts:**
+- Users register/login with email and password
+- After login, users configure their Supabase storage credentials in Settings
+- API keys are encrypted with AES-256-GCM before storing in database
+- Each API request uses the authenticated user's decrypted credentials
 
 ## Tech Stack
 
 - **Frontend**: Next.js 14, React 18, Tailwind CSS
-- **Backend**: Next.js API Routes
-- **Storage**: Supabase Storage (@supabase/supabase-js)
+- **Backend**: Next.js API Routes, JWT authentication
+- **Auth**: Supabase Auth (central project)
+- **Storage**: Supabase Storage (user-configured)
+- **Encryption**: Node.js crypto (AES-256-GCM)
 - **File Parsing**: Formidable (multipart form data)
 - **CLI**: Node.js with inquirer, cli-progress
 
@@ -19,54 +33,83 @@ This is a web-based file manager that allows uploading, downloading, previewing,
 ```
 SUPABASE-UPLOADER/
 ├── pages/
-│   ├── api/                    # API endpoints
-│   │   ├── buckets.js          # GET - List buckets
-│   │   ├── download.js         # GET - Download files
-│   │   ├── files.js            # GET/DELETE - List/delete files
-│   │   ├── logs.js             # GET - Read logs
-│   │   ├── preview.js          # GET - Preview files
-│   │   ├── upload.js           # POST - Upload files
-│   │   └── files/url.js        # GET - Get file URLs
-│   ├── _app.js
-│   └── index.js                # Main UI
+│   ├── api/
+│   │   ├── auth/               # Auth endpoints (login, register, logout)
+│   │   ├── settings.js         # User settings CRUD
+│   │   ├── settings/test.js    # Test Supabase connection
+│   │   ├── buckets.js          # List buckets (auth required)
+│   │   ├── upload.js           # Upload files
+│   │   ├── files.js            # List/delete files
+│   │   ├── download.js         # Download files
+│   │   ├── preview.js          # Preview files
+│   │   ├── rename.js           # Rename files
+│   │   ├── move.js             # Move files
+│   │   ├── folders.js          # Create/delete folders
+│   │   ├── bulk-download.js    # Bulk download as ZIP
+│   │   ├── files/url.js        # Get file URLs
+│   │   ├── logs.js             # Activity logs
+│   │   └── health.js           # Health check
+│   ├── login.js                # Login/register page
+│   ├── index.js                # Main UI (auth required)
+│   └── _app.js                 # AuthProvider wrapper
 ├── components/
+│   ├── LoginForm.js            # Auth form component
+│   ├── SettingsModal.js        # Supabase config modal
 │   ├── UploadTab.js            # Upload interface
 │   ├── FilesTab.js             # File management
 │   ├── LogsTab.js              # Log viewer
 │   ├── FilePreview.js          # Preview modal
+│   ├── ConfirmModal.js         # Confirmation dialogs
 │   └── Toast.js                # Notifications
+├── contexts/
+│   └── AuthContext.js          # Auth state and methods
 ├── utils/
-│   ├── supabaseClient.js       # Supabase client
+│   ├── authMiddleware.js       # JWT verification middleware
+│   ├── authSupabaseClient.js   # Auth Supabase client
+│   ├── storageClientFactory.js # Creates user's storage client
+│   ├── userSettings.js         # Settings CRUD operations
+│   ├── encryption.js           # AES-256-GCM encryption
+│   ├── security.js             # Path/file validation
+│   ├── apiHelpers.js           # Response helpers
 │   ├── serverHelpers.js        # Server utilities
 │   ├── clientHelpers.js        # Client utilities
-│   ├── api.js                  # API helpers
 │   ├── uploadHelpers.js        # Upload utilities
 │   └── bucketHelpers.js        # Bucket utilities
+├── database/
+│   └── user_settings.sql       # Auth project migration
 ├── uploadToSupabase.js         # CLI tool
-└── styles/globals.css          # Tailwind styles
+└── middleware.js               # Rate limiting
 ```
 
 ## Key Files
 
-- `pages/api/upload.js` - Handles file uploads with Formidable, 100MB max, 5min timeout
-- `pages/api/files.js` - List and delete files from buckets
-- `pages/api/download.js` - Stream files to client with proper headers
-- `uploadToSupabase.js` - Standalone CLI for batch uploads, exports reusable functions
-- `utils/serverHelpers.js` - Security functions (escapeHtml, cleanupTempFile, withTimeout)
-- `utils/clientHelpers.js` - Formatting (formatFileSize, formatDate, getFileIcon)
+- `contexts/AuthContext.js` - Auth state, signIn/signUp/signOut, settings management
+- `utils/authMiddleware.js` - `withAuth()` HOC for protected API routes
+- `utils/storageClientFactory.js` - Creates Supabase clients with user's credentials
+- `utils/encryption.js` - AES-256-GCM encrypt/decrypt for API keys
+- `utils/userSettings.js` - CRUD for user settings in auth database
+- `pages/api/settings.js` - GET/POST user Supabase credentials
+- `components/SettingsModal.js` - UI for configuring Supabase connection
 
 ## Environment Variables
 
 Required in `.env`:
-```
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your_service_role_key
+```env
+# Auth Supabase (central project)
+NEXT_PUBLIC_AUTH_SUPABASE_URL=https://your-auth-project.supabase.co
+NEXT_PUBLIC_AUTH_SUPABASE_ANON_KEY=your-anon-key
+AUTH_SUPABASE_SERVICE_KEY=your-service-role-key
+
+# Encryption key (32 bytes as 64 hex chars)
+ENCRYPTION_KEY=your-64-char-hex-key
 ```
 
-Optional:
-```
-SUPABASE_BUCKET=files          # Default bucket name
-MAX_RETRIES=3                  # Upload retry attempts
+Optional (for CLI backward compatibility):
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your_service_role_key
+SUPABASE_BUCKET=files
+MAX_RETRIES=3
 LOG_FILE=supabase-uploader.log
 ENABLE_LOGGING=true
 ```
@@ -81,23 +124,14 @@ npm run cli      # Run CLI tool
 npm run lint     # ESLint check
 ```
 
-## CLI Usage
-
-```bash
-# Single file
-node uploadToSupabase.js <file> [bucket] [path]
-
-# Batch upload
-node uploadToSupabase.js --batch file1 file2 ... [bucket]
-
-# Directory upload
-node uploadToSupabase.js --dir ./folder [bucket] [--recursive]
-```
-
 ## API Endpoints
+
+All storage endpoints require authentication (except `/api/health`).
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
+| `/api/settings` | GET/POST | User Supabase credentials |
+| `/api/settings/test` | POST | Test Supabase connection |
 | `/api/upload` | POST | Upload file (multipart form) |
 | `/api/files` | GET | List files in bucket |
 | `/api/files` | DELETE | Delete file |
@@ -105,45 +139,51 @@ node uploadToSupabase.js --dir ./folder [bucket] [--recursive]
 | `/api/preview` | GET | Preview file content |
 | `/api/buckets` | GET | List all buckets |
 | `/api/files/url` | GET | Get file URL |
+| `/api/rename` | POST | Rename file |
+| `/api/move` | POST | Move file to folder |
+| `/api/folders` | POST/DELETE | Create/delete folders |
+| `/api/bulk-download` | POST | Download multiple files as ZIP |
 | `/api/logs` | GET | Get log entries |
+| `/api/health` | GET | Health check |
 
-## Security Considerations
+## Security Features
 
-- Uses service_role key (server-side only, never expose to client)
-- XSS protection via escape functions in serverHelpers.js
-- Temp files cleaned up after upload processing
-- All file operations go through API routes (no direct bucket access)
+- **User Authentication** - Email/password with Supabase Auth
+- **Encrypted Credentials** - API keys encrypted with AES-256-GCM
+- **JWT Verification** - All protected routes verify access tokens
+- **Rate Limiting** - Configurable per-endpoint limits
+- **Path Traversal Protection** - Blocks `../` and malicious paths
+- **File Type Validation** - Magic byte checking, blocks executables
+- **Security Headers** - CSP, X-Frame-Options, nosniff, etc.
+- **Row Level Security** - Users access only their own settings
 
 ## Limitations
 
-- No user authentication (shared bucket access)
-- No rate limiting (implement before production)
 - Max 100MB file size
 - 5-minute upload timeout
-- Files loaded into memory (streaming needed for large files)
+- In-memory rate limiter (not suitable for multi-instance)
 
-## Preview Support
+## Database Schema
 
-- **Images**: jpg, jpeg, png, gif, webp, svg, bmp
-- **Video**: mp4, avi, mov, webm, mkv
-- **Audio**: mp3, wav, ogg
-- **Documents**: pdf
+Run `database/user_settings.sql` in your auth Supabase project:
 
-## Theme
-
-Dark theme with custom Tailwind colors defined in `tailwind.config.js`. Primary accent: indigo (#6366f1).
-
-## Logging
-
-Logs written to `supabase-uploader.log` with format:
+```sql
+CREATE TABLE user_settings (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id),
+  supabase_url TEXT,
+  supabase_key_encrypted TEXT,  -- AES-256-GCM encrypted
+  default_bucket TEXT DEFAULT 'files',
+  max_retries INTEGER DEFAULT 3,
+  theme TEXT DEFAULT 'dark',
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+);
 ```
-[ISO_TIMESTAMP] [LEVEL] message {JSON_DATA}
-```
-
-View in UI via Logs tab (last 50 entries) or read file directly.
 
 ## See Also
 
-- `TODO.md` - Feature roadmap and security improvements
-- `SECURITY.md` - Security documentation
 - `README.md` - User-facing documentation
+- `TODO.md` - Feature roadmap
+- `SECURITY.md` - Detailed security documentation
+- `CHANGELOG.md` - Version history

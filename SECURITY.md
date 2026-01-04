@@ -6,6 +6,10 @@ This document describes all security features implemented in the Supabase File M
 
 | Feature | Status | Location |
 |---------|--------|----------|
+| User Authentication | ✅ Implemented | `contexts/AuthContext.js`, `utils/authMiddleware.js` |
+| Encrypted Credentials | ✅ Implemented | `utils/encryption.js` |
+| JWT Verification | ✅ Implemented | `utils/authMiddleware.js` |
+| Row Level Security | ✅ Implemented | `database/user_settings.sql` |
 | Rate Limiting | ✅ Implemented | `middleware.js` |
 | Path Traversal Protection | ✅ Implemented | `utils/security.js` |
 | File Type Validation | ✅ Implemented | `utils/security.js` |
@@ -13,6 +17,108 @@ This document describes all security features implemented in the Supabase File M
 | Environment Validation | ✅ Implemented | `utils/envValidation.js` |
 | Input Sanitization | ✅ Implemented | `utils/security.js` |
 | HTTP Header Escaping | ✅ Implemented | `pages/api/download.js`, `pages/api/preview.js` |
+
+---
+
+## User Authentication
+
+**Location**: `contexts/AuthContext.js`, `utils/authMiddleware.js`
+
+Uses Supabase Auth for secure email/password authentication.
+
+### Features
+
+- Email/password registration and login
+- JWT-based session tokens
+- Automatic token refresh
+- Secure cookie storage
+- Session persistence across page reloads
+
+### Auth Middleware
+
+```javascript
+import { withAuth } from '../utils/authMiddleware';
+
+// Require authentication
+export default withAuth(async (req, res) => {
+  const userId = req.user.id;
+  // Handler code
+});
+
+// Optional authentication
+export default withAuth(handler, { optional: true });
+```
+
+### Token Extraction
+
+Tokens are extracted from (in order):
+1. `Authorization: Bearer <token>` header
+2. `token` query parameter (for browser-initiated requests)
+3. Supabase auth cookies
+
+---
+
+## Encrypted Credential Storage
+
+**Location**: `utils/encryption.js`
+
+User Supabase API keys are encrypted before storing in the database using AES-256-GCM.
+
+### Algorithm Details
+
+| Property | Value |
+|----------|-------|
+| Algorithm | AES-256-GCM |
+| Key Size | 256 bits (32 bytes) |
+| IV Length | 16 bytes (random per encryption) |
+| Auth Tag | 16 bytes |
+
+### Encryption Flow
+
+1. Generate random 16-byte IV
+2. Encrypt plaintext with AES-256-GCM
+3. Combine: `IV + AuthTag + Ciphertext`
+4. Encode as Base64
+
+### Key Management
+
+```bash
+# Generate encryption key
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Set in `.env`:
+```env
+ENCRYPTION_KEY=your-64-character-hex-key
+```
+
+### Security Properties
+
+- **Confidentiality**: AES-256 encryption
+- **Integrity**: GCM authentication tag
+- **Unique IVs**: Random IV per encryption prevents pattern analysis
+- **Key never exposed**: Server-side only, never sent to client
+
+---
+
+## Row Level Security
+
+**Location**: `database/user_settings.sql`
+
+PostgreSQL RLS ensures users can only access their own data.
+
+### Policies
+
+| Policy | Description |
+|--------|-------------|
+| SELECT | `auth.uid() = user_id` |
+| INSERT | `auth.uid() = user_id` |
+| UPDATE | `auth.uid() = user_id` |
+| DELETE | `auth.uid() = user_id` |
+
+### Service Role Access
+
+The server uses `service_role` key to bypass RLS after verifying JWT.
 
 ---
 
@@ -295,8 +401,7 @@ my_bucket_123                 → Valid
 
 ## Known Limitations
 
-1. **No Authentication**: Application currently has no user authentication
-2. **In-Memory Rate Limiter**: Not suitable for multi-instance deployments
-3. **TypeScript Strict Mode**: Not enabled (may miss type errors)
+1. **In-Memory Rate Limiter**: Not suitable for multi-instance deployments (use Redis for production clusters)
+2. **JavaScript Codebase**: TypeScript types available but not enforced
 
 See `TODO.md` for planned improvements.

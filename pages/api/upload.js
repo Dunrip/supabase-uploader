@@ -1,8 +1,10 @@
 import { IncomingForm } from 'formidable';
-import { uploadFile, listFiles } from '../../uploadToSupabase';
-import { getTempDir, getDefaultBucket, cleanupTempFile, withTimeout } from '../../utils/serverHelpers';
+import { uploadFile, listFiles } from '../../utils/storageOperations.js';
+import { getTempDir, cleanupTempFile, withTimeout } from '../../utils/serverHelpers';
 import { validateMethod, sendSuccess, sendError } from '../../utils/apiHelpers';
 import { validateStoragePath, validateBucketName, validateFileType, validateFilename } from '../../utils/security';
+import { withAuth } from '../../utils/authMiddleware.js';
+import { createStorageClientWithErrorHandling } from '../../utils/storageClientFactory.js';
 
 export const config = {
   api: {
@@ -41,8 +43,14 @@ function generateUniqueFileName(fileName, existingFiles) {
   return newFileName;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (!validateMethod(req, res, 'POST')) return;
+
+  // Get user's storage client
+  const storageResult = await createStorageClientWithErrorHandling(req, res);
+  if (!storageResult) return;
+
+  const { client: supabase, settings } = storageResult;
 
   let uploadedFile = null;
 
@@ -81,7 +89,7 @@ export default async function handler(req, res) {
     }
 
     // Validate bucket name
-    const bucketName = fields.bucket?.[0] || getDefaultBucket();
+    const bucketName = fields.bucket?.[0] || settings.default_bucket || 'files';
     const bucketValidation = validateBucketName(bucketName);
     if (!bucketValidation.valid) {
       cleanupTempFile(file.filepath);
@@ -98,12 +106,12 @@ export default async function handler(req, res) {
       }
       storagePath = pathValidation.sanitized;
     }
-    
+
     // Check for duplicate filenames and rename if necessary
     if (storagePath && !fields.path?.[0]) {
       // Only auto-rename if no custom path was provided
       try {
-        const existingFiles = await listFiles(bucketName, '');
+        const existingFiles = await listFiles(supabase, bucketName, '');
         // Filter out folders - folders don't have metadata property
         const existingFileNames = existingFiles
           .filter(f => f.metadata !== null && f.metadata !== undefined)
@@ -115,7 +123,7 @@ export default async function handler(req, res) {
       }
     }
 
-    const uploadPromise = uploadFile(file.filepath, bucketName, storagePath, false);
+    const uploadPromise = uploadFile(supabase, file.filepath, bucketName, storagePath, settings.max_retries);
     const result = await withTimeout(
       uploadPromise,
       UPLOAD_TIMEOUT,
@@ -130,7 +138,7 @@ export default async function handler(req, res) {
 
     sendSuccess(res, result);
   } catch (error) {
-    console.error(`❌ Upload failed:`, error);
+    console.error('Upload failed:', error);
 
     if (uploadedFile?.filepath) {
       cleanupTempFile(uploadedFile.filepath);
@@ -139,3 +147,5 @@ export default async function handler(req, res) {
     sendError(res, error.message || 'Upload failed. Please check server logs.', 500);
   }
 }
+
+export default withAuth(handler);

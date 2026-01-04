@@ -1,17 +1,21 @@
-import { getSupabaseClient } from '../../utils/supabaseClient';
-import { getDefaultBucket } from '../../utils/serverHelpers';
 import { validateMethod, sendSuccess, sendError } from '../../utils/apiHelpers';
 import { validateStoragePath, validateBucketName, validateFilename } from '../../utils/security';
+import { withAuth } from '../../utils/authMiddleware.js';
+import { createStorageClientWithErrorHandling } from '../../utils/storageClientFactory.js';
 
-export default async function handler(req, res) {
-  const supabase = getSupabaseClient();
+async function handler(req, res) {
+  // Get user's storage client
+  const storageResult = await createStorageClientWithErrorHandling(req, res);
+  if (!storageResult) return;
+
+  const { client: supabase, settings } = storageResult;
 
   if (req.method === 'POST') {
     // Create folder
     const { folderName, parentPath, bucket } = req.body;
 
     // Validate bucket
-    const bucketName = bucket || getDefaultBucket();
+    const bucketName = bucket || settings.default_bucket || 'files';
     const bucketValidation = validateBucketName(bucketName);
     if (!bucketValidation.valid) {
       return sendError(res, bucketValidation.error, 400);
@@ -81,7 +85,7 @@ export default async function handler(req, res) {
     }
 
     // Validate bucket
-    const bucketName = bucket || getDefaultBucket();
+    const bucketName = bucket || settings.default_bucket || 'files';
     const bucketValidation = validateBucketName(bucketName);
     if (!bucketValidation.valid) {
       return sendError(res, bucketValidation.error, 400);
@@ -141,3 +145,5 @@ export default async function handler(req, res) {
     return validateMethod(req, res, ['POST', 'DELETE']);
   }
 }
+
+export default withAuth(handler);

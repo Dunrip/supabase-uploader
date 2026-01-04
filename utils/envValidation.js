@@ -4,32 +4,67 @@
  */
 
 /**
+ * Validate URL format
+ */
+function isValidUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validate Supabase key format
+ */
+function isValidSupabaseKey(value) {
+  // Supabase supports multiple key formats:
+  // 1. JWT tokens (anon/service role): 3 parts separated by dots
+  // 2. Secret keys: sb_secret_... format
+  const isJWT = /^[A-Za-z0-9_=-]+\.[A-Za-z0-9_=-]+\.[A-Za-z0-9_=-]+$/.test(value);
+  const isSecretKey = /^sb_[a-z]+_[A-Za-z0-9]+$/.test(value);
+  return isJWT || isSecretKey || value.length >= 20; // Fallback: accept if long enough
+}
+
+/**
  * Required environment variables with descriptions
+ * Note: SUPABASE_URL and SUPABASE_KEY are now optional (legacy/CLI support)
+ * Auth uses NEXT_PUBLIC_AUTH_SUPABASE_URL and related vars
  */
 const REQUIRED_ENV_VARS = {
-  SUPABASE_URL: {
-    description: 'Supabase project URL',
+  // Auth Supabase (central project for authentication)
+  NEXT_PUBLIC_AUTH_SUPABASE_URL: {
+    description: 'Central Supabase URL for authentication',
+    validate: isValidUrl,
+    errorMessage: 'Must be a valid URL (e.g., https://your-auth-project.supabase.co)',
+  },
+  NEXT_PUBLIC_AUTH_SUPABASE_ANON_KEY: {
+    description: 'Central Supabase anon key for client-side auth',
+    validate: isValidSupabaseKey,
+    errorMessage: 'Must be a valid Supabase key (JWT format)',
+  },
+  AUTH_SUPABASE_SERVICE_KEY: {
+    description: 'Central Supabase service role key for server-side auth',
+    validate: isValidSupabaseKey,
+    errorMessage: 'Must be a valid Supabase service role key',
+  },
+  ENCRYPTION_KEY: {
+    description: 'Encryption key for storing user API keys (32 bytes, hex or base64)',
     validate: (value) => {
+      // Check hex format (64 chars = 32 bytes)
+      if (/^[a-f0-9]+$/i.test(value) && value.length === 64) {
+        return true;
+      }
+      // Check base64 format
       try {
-        const url = new URL(value);
-        return url.protocol === 'https:' || url.protocol === 'http:';
+        const decoded = Buffer.from(value, 'base64');
+        return decoded.length === 32;
       } catch {
         return false;
       }
     },
-    errorMessage: 'Must be a valid URL (e.g., https://your-project.supabase.co)',
-  },
-  SUPABASE_KEY: {
-    description: 'Supabase service role key or secret key',
-    validate: (value) => {
-      // Supabase supports multiple key formats:
-      // 1. JWT tokens (anon/service role): 3 parts separated by dots
-      // 2. Secret keys: sb_secret_... format
-      const isJWT = /^[A-Za-z0-9_=-]+\.[A-Za-z0-9_=-]+\.[A-Za-z0-9_=-]+$/.test(value);
-      const isSecretKey = /^sb_[a-z]+_[A-Za-z0-9]+$/.test(value);
-      return isJWT || isSecretKey || value.length >= 20; // Fallback: accept if long enough
-    },
-    errorMessage: 'Must be a valid Supabase key (JWT or secret key format)',
+    errorMessage: 'Must be 32 bytes (64 hex characters or 44 base64 characters)',
   },
 };
 
@@ -37,6 +72,17 @@ const REQUIRED_ENV_VARS = {
  * Optional environment variables with defaults
  */
 const OPTIONAL_ENV_VARS = {
+  // Legacy Supabase vars (for CLI tool backward compatibility)
+  SUPABASE_URL: {
+    description: 'Legacy Supabase project URL (for CLI tool)',
+    validate: isValidUrl,
+    errorMessage: 'Must be a valid URL',
+  },
+  SUPABASE_KEY: {
+    description: 'Legacy Supabase service key (for CLI tool)',
+    validate: isValidSupabaseKey,
+    errorMessage: 'Must be a valid Supabase key',
+  },
   SUPABASE_BUCKET: {
     description: 'Default storage bucket name',
     default: 'files',
