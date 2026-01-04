@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (v1-features)
+## Unreleased (authentication)
 
 ### Added
 - **User Authentication System**
