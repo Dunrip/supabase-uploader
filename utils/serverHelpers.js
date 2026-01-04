@@ -79,17 +79,64 @@ export function getDefaultBucket() {
 }
 
 /**
- * Clean up temporary file
+ * Clean up temporary file with retry logic
  * @param {string} filePath - Path to file to delete
+ * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
+ * @param {number} retryDelay - Delay between retries in ms (default: 100)
  */
-export function cleanupTempFile(filePath) {
-  try {
-    if (filePath && fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+export function cleanupTempFile(filePath, maxRetries = 3, retryDelay = 100) {
+  if (!filePath) return;
+
+  const attemptCleanup = (retriesLeft) => {
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (err) {
+      if (retriesLeft > 0) {
+        // Retry after delay
+        setTimeout(() => {
+          attemptCleanup(retriesLeft - 1);
+        }, retryDelay);
+      } else {
+        // Log failure after all retries exhausted
+        console.warn(`Failed to delete temp file after ${maxRetries} attempts:`, filePath, err.message);
+      }
     }
-  } catch (err) {
-    console.warn('Failed to delete temp file:', err.message);
+  };
+
+  attemptCleanup(maxRetries);
+}
+
+/**
+ * Async version of cleanupTempFile with retry logic
+ * @param {string} filePath - Path to file to delete
+ * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
+ * @param {number} retryDelay - Delay between retries in ms (default: 100)
+ * @returns {Promise<boolean>} True if file was deleted, false otherwise
+ */
+export async function cleanupTempFileAsync(filePath, maxRetries = 3, retryDelay = 100) {
+  if (!filePath) return false;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (fs.existsSync(filePath)) {
+        await fs.promises.unlink(filePath);
+        return true;
+      }
+      return true; // File doesn't exist, consider it cleaned up
+    } catch (err) {
+      if (attempt < maxRetries) {
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      } else {
+        // Log failure after all retries exhausted
+        console.warn(`Failed to delete temp file after ${maxRetries + 1} attempts:`, filePath, err.message);
+        return false;
+      }
+    }
   }
+  return false;
 }
 
 /**

@@ -1,118 +1,302 @@
-# Security: HTML Escaping
+# Security Documentation
 
-## Issue Description
+This document describes all security features implemented in the Supabase File Manager.
 
-When embedding user-provided data (like file names or paths) into HTML attributes via string interpolation, special characters can break JavaScript syntax and cause security vulnerabilities.
+## Security Features Overview
 
-### Example Problem
+| Feature | Status | Location |
+|---------|--------|----------|
+| Rate Limiting | ✅ Implemented | `middleware.js` |
+| Path Traversal Protection | ✅ Implemented | `utils/security.js` |
+| File Type Validation | ✅ Implemented | `utils/security.js` |
+| Security Headers | ✅ Implemented | `next.config.js` |
+| Environment Validation | ✅ Implemented | `utils/envValidation.js` |
+| Input Sanitization | ✅ Implemented | `utils/security.js` |
+| HTTP Header Escaping | ✅ Implemented | `pages/api/download.js`, `pages/api/preview.js` |
 
-If a file is named `test's file.txt`, embedding it directly into an `onclick` attribute would generate invalid JavaScript:
+---
 
-```html
-<!-- ❌ BROKEN - Single quote breaks JavaScript -->
-<button onclick="deleteFile('test's file.txt', 'test's file.txt')">Delete</button>
+## Rate Limiting
+
+**Location**: `middleware.js`
+
+Protects against API abuse with configurable per-endpoint limits.
+
+### Configuration
+
+| Endpoint | Limit | Window |
+|----------|-------|--------|
+| `/api/upload` | 20 requests | 1 minute |
+| `/api/download` | 100 requests | 1 minute |
+| `/api/files` | 100 requests | 1 minute |
+| `/api/buckets` | 50 requests | 1 minute |
+| `/api/preview` | 100 requests | 1 minute |
+| Default | 100 requests | 1 minute |
+
+### Response Headers
+
+- `X-RateLimit-Limit`: Maximum requests allowed
+- `X-RateLimit-Remaining`: Requests remaining in window
+- `X-RateLimit-Reset`: Seconds until window resets
+- `Retry-After`: Seconds to wait (when rate limited)
+
+### Rate Limit Response (429)
+
+```json
+{
+  "success": false,
+  "error": "Too many requests. Please try again later.",
+  "retryAfter": 45
+}
 ```
 
-This results in a JavaScript syntax error because the single quote in the filename terminates the string prematurely.
+> **Note**: Uses in-memory storage. For production with multiple instances, use Redis or similar distributed store.
 
-## Solution
+---
 
-### For React/JSX (Current Implementation)
+## Path Traversal Protection
 
-The current Next.js/React implementation uses proper event handlers, which automatically handle escaping:
+**Location**: `utils/security.js`
 
-```jsx
-// ✅ SAFE - React handles escaping automatically
-<button onClick={() => deleteFile(file.path, file.name)}>Delete</button>
-```
+Prevents directory traversal attacks that could access files outside the intended storage.
 
-React automatically escapes all values passed to event handlers, so this is safe.
+### Blocked Patterns
 
-### For Plain HTML/String Templates
+- `../` - Parent directory reference
+- Absolute paths (`/path`, `C:\path`)
+- URL-encoded attacks (`%2e%2e`, `%252e%252e`)
+- UTF-8 overlong encoding (`%c0%ae`, `%c1%9c`)
+- Null bytes (`\x00`)
+- Consecutive slashes (`//`, `\\`)
 
-If you need to generate HTML strings (e.g., for server-side rendering or email templates), use the provided escaping functions:
-
-#### Client-Side (`utils/clientHelpers.js`)
+### Validation Functions
 
 ```javascript
-import { escapeHtml, escapeHtmlAttribute, escapeJsString } from '../utils/clientHelpers';
+import { validateStoragePath, validateBucketName, validateFilename } from './utils/security';
 
-// For HTML content (text nodes)
-const safeText = escapeHtml(userInput); // Escapes: < > & " '
+// Validate storage path
+const { valid, error, sanitized } = validateStoragePath(userPath);
 
-// For HTML attributes
-const safeAttr = escapeHtmlAttribute(userInput); // Escapes: < > & " ' (with &#39; for single quotes)
+// Validate bucket name (alphanumeric, hyphens, underscores)
+const { valid, error } = validateBucketName(bucketName);
 
-// For JavaScript strings
-const safeJs = escapeJsString(userInput); // Escapes: \ ' " \n \r \t
+// Validate filename
+const { valid, error, sanitized } = validateFilename(fileName);
 ```
 
-#### Server-Side (`utils/serverHelpers.js`)
+---
+
+## File Type Validation
+
+**Location**: `utils/security.js`
+
+Validates file types using magic bytes (file signatures) to prevent extension spoofing.
+
+### Supported File Types
+
+**Images**: JPEG, PNG, GIF, WebP, BMP, ICO, SVG
+**Documents**: PDF
+**Archives**: ZIP, GZIP, RAR, 7z, TAR
+**Audio**: MP3, WAV, OGG, FLAC
+**Video**: MP4, WebM, AVI, MKV, MOV
+**Text**: JSON, TXT, HTML, CSS, JS, MD, XML, CSV
+
+### Blocked Extensions
+
+Executables and scripts that could pose security risks:
+
+- **Windows**: exe, msi, dll, scr, cpl, com, pif
+- **Scripts**: bat, cmd, ps1, vbs, sh, bash, php, asp, jsp, py, pl
+- **Packages**: jar, war, deb, rpm, apk, dmg, pkg
+- **Other**: reg, inf, lnk
+
+### Usage
 
 ```javascript
-import { escapeHtml, escapeHtmlAttribute, escapeJsString } from '../utils/serverHelpers';
+import { validateFileType, isBlockedExtension } from './utils/security';
 
-// Same functions available on server-side
-const safeText = escapeHtml(userInput);
-const safeAttr = escapeHtmlAttribute(userInput);
-const safeJs = escapeJsString(userInput);
+// Check magic bytes
+const { valid, error, detectedType } = await validateFileType(filePath, filename);
+
+// Quick extension check
+const blocked = isBlockedExtension('malware.exe'); // true
 ```
 
-### Example Usage
+---
+
+## Security Headers
+
+**Location**: `next.config.js`
+
+HTTP security headers applied to all responses.
+
+### Headers Applied
+
+| Header | Value | Purpose |
+|--------|-------|---------|
+| X-Content-Type-Options | nosniff | Prevent MIME sniffing |
+| X-Frame-Options | DENY | Prevent clickjacking |
+| X-XSS-Protection | 1; mode=block | XSS filter |
+| Referrer-Policy | strict-origin-when-cross-origin | Control referrer info |
+| Permissions-Policy | camera=(), microphone=(), geolocation=() | Disable sensitive APIs |
+| Content-Security-Policy | Restrictive CSP | Prevent XSS/injection |
+
+### Content Security Policy
+
+```
+default-src 'self';
+script-src 'self' 'unsafe-inline' 'unsafe-eval';
+style-src 'self' 'unsafe-inline';
+img-src 'self' data: blob:;
+font-src 'self';
+connect-src 'self';
+media-src 'self' blob:;
+object-src 'none';
+frame-ancestors 'none';
+base-uri 'self';
+form-action 'self';
+```
+
+### API Route Headers
+
+API routes have additional cache-control headers to prevent caching sensitive data:
+
+```
+Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate
+Pragma: no-cache
+Expires: 0
+```
+
+---
+
+## Environment Validation
+
+**Location**: `utils/envValidation.js`
+
+Validates required environment variables at startup.
+
+### Required Variables
+
+| Variable | Validation |
+|----------|------------|
+| SUPABASE_URL | Must be valid HTTPS/HTTP URL |
+| SUPABASE_KEY | Must be valid JWT format (3 base64url parts) |
+
+### Optional Variables
+
+| Variable | Default | Validation |
+|----------|---------|------------|
+| SUPABASE_BUCKET | `files` | - |
+| MAX_RETRIES | `3` | Non-negative integer |
+| LOG_FILE | `supabase-uploader.log` | - |
+| ENABLE_LOGGING | `true` | true/false/1/0 |
+| NODE_ENV | `development` | - |
+
+### Usage
 
 ```javascript
-// ❌ UNSAFE - Direct string interpolation
-const html = `<button onclick="deleteFile('${fileName}', '${fileName}')">Delete</button>`;
+import { validateEnvironmentOrExit } from './utils/envValidation';
 
-// ✅ SAFE - Using escapeJsString for JavaScript context
-const html = `<button onclick="deleteFile('${escapeJsString(fileName)}', '${escapeJsString(fileName)}')">Delete</button>`;
-
-// ✅ SAFE - Using escapeHtmlAttribute for HTML attributes
-const html = `<button data-filename="${escapeHtmlAttribute(fileName)}">Delete</button>`;
-
-// ✅ SAFE - Using escapeHtml for text content
-const html = `<span>${escapeHtml(fileName)}</span>`;
+// Validate and exit if invalid
+validateEnvironmentOrExit();
 ```
 
-## Functions Provided
+---
 
-### `escapeHtml(text)`
-- **Purpose**: Escape HTML content for text nodes
-- **Escapes**: `<`, `>`, `&`, `"`, `'`
-- **Use case**: Displaying user input in HTML text content
+## HTTP Header Escaping
 
-### `escapeHtmlAttribute(text)`
-- **Purpose**: Escape HTML attribute values
-- **Escapes**: `<`, `>`, `&`, `"`, `'` (single quotes become `&#39;`)
-- **Use case**: Embedding user input in HTML attributes like `data-*`, `title`, `alt`, etc.
+**Location**: `pages/api/download.js`, `pages/api/preview.js`
 
-### `escapeJsString(text)`
-- **Purpose**: Escape JavaScript string literals
-- **Escapes**: `\`, `'`, `"`, `\n`, `\r`, `\t`
-- **Use case**: Embedding user input in JavaScript code (e.g., in `onclick` handlers, JSON, etc.)
+Properly escapes filenames in Content-Disposition headers per RFC 5987.
 
-## Current Status
+### Implementation
 
-✅ **Fixed**: The current React implementation is safe because it uses proper event handlers.
+```javascript
+// Escape quotes and newlines for basic filename
+const safeFileName = fileName.replace(/"/g, '\\"').replace(/\n/g, '');
 
-✅ **Added**: Escaping utility functions are now available for any future use cases that require string interpolation.
+// URL-encode for filename* parameter
+const encodedFileName = encodeURIComponent(fileName);
 
-✅ **Fixed**: HTTP header escaping in download API now properly handles special characters in filenames.
+// Set header with both formats for compatibility
+res.setHeader('Content-Disposition',
+  `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodedFileName}`
+);
+```
+
+### Handles
+
+- Quotes in filenames: `file"name".pdf`
+- Single quotes: `test's file.txt`
+- Newlines and special characters
+- Unicode characters
+
+---
+
+## HTML/JavaScript Escaping
+
+**Location**: `utils/serverHelpers.js`, `utils/clientHelpers.js`
+
+Escaping functions for server-side HTML generation (not currently used - React handles escaping automatically).
+
+### Functions
+
+| Function | Escapes | Use Case |
+|----------|---------|----------|
+| `escapeHtml()` | `< > & " '` | Text content |
+| `escapeHtmlAttribute()` | `< > & " '` (&#39; for quotes) | HTML attributes |
+| `escapeJsString()` | `\ ' " \n \r \t` | JavaScript strings |
+
+### Current Status
+
+- ✅ React/Next.js handles escaping automatically for JSX
+- ✅ Functions available for future server-side HTML generation
+- ✅ HTTP headers properly escaped in API routes
+
+---
 
 ## Best Practices
 
-1. **Prefer React event handlers** over string interpolation for dynamic content
-2. **Never trust user input** - always escape when embedding in HTML/JS
-3. **Use the appropriate escaping function** for the context (HTML content vs attributes vs JS)
-4. **Test with edge cases** like filenames with quotes, newlines, and special characters
+1. **Never trust user input** - All paths, filenames, and bucket names are validated
+2. **Use appropriate escaping** - Context-aware escaping for HTML, JS, and HTTP headers
+3. **Fail fast** - Environment validation on startup prevents misconfiguration
+4. **Defense in depth** - Multiple layers of validation (extension + magic bytes)
+5. **Secure defaults** - Rate limiting, security headers, and CSP enabled by default
 
-## Testing
+---
 
-Test cases that should work correctly:
+## Testing Security
 
-- `test's file.txt` (single quote)
-- `file"name".pdf` (double quote)
-- `file<script>.js` (HTML tags)
-- `file&name.txt` (ampersand)
-- `file\nname.txt` (newline)
-- `file\\name.txt` (backslash)
+Test cases for validation:
+
+```
+# Path Traversal
+../../../etc/passwd          → Blocked
+%2e%2e%2f                     → Blocked
+..\..\windows\system32       → Blocked
+
+# Blocked Extensions
+malware.exe                   → Blocked
+script.php                    → Blocked
+backdoor.sh                   → Blocked
+
+# Special Filenames
+test's file.txt               → Allowed (properly escaped)
+file"with"quotes.pdf          → Allowed (properly escaped)
+file<script>alert.js          → Blocked (.js is blocked)
+
+# Bucket Names
+my-bucket                     → Valid
+my_bucket_123                 → Valid
+../hack                       → Invalid
+```
+
+---
+
+## Known Limitations
+
+1. **No Authentication**: Application currently has no user authentication
+2. **In-Memory Rate Limiter**: Not suitable for multi-instance deployments
+3. **TypeScript Strict Mode**: Not enabled (may miss type errors)
+
+See `TODO.md` for planned improvements.

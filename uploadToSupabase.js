@@ -29,6 +29,32 @@ const RETRY_DELAY_BASE = 1000; // Base delay in milliseconds
 const LOG_FILE = process.env.LOG_FILE || 'supabase-uploader.log';
 const ENABLE_LOGGING = process.env.ENABLE_LOGGING !== 'false'; // Default to true
 
+const ENABLE_EMOJI = process.env.ENABLE_EMOJI !== 'false'; // Default to true
+
+const EMOJI_REGEX = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu;
+
+function sanitizeCliString(value) {
+  if (ENABLE_EMOJI || typeof value !== 'string') {
+    return value;
+  }
+
+  return value.replace(EMOJI_REGEX, '');
+}
+
+if (!ENABLE_EMOJI) {
+  const originalConsole = {
+    log: console.log,
+    error: console.error,
+    warn: console.warn,
+    info: console.info,
+  };
+
+  console.log = (...args) => originalConsole.log(...args.map(sanitizeCliString));
+  console.error = (...args) => originalConsole.error(...args.map(sanitizeCliString));
+  console.warn = (...args) => originalConsole.warn(...args.map(sanitizeCliString));
+  console.info = (...args) => originalConsole.info(...args.map(sanitizeCliString));
+}
+
 // Validate environment variables
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error('❌ Error: Missing required environment variables');
@@ -162,7 +188,7 @@ async function uploadFile(filePath, bucketName = DEFAULT_BUCKET, storagePath = n
     let progressBar;
     if (showProgress && fileSize > 1024) { // Only show progress for files > 1KB
       progressBar = new cliProgress.SingleBar({
-        format: `📤 Uploading: ${fileName} |{bar}| {percentage}% | {value}/{total} ${formatFileSize(fileSize)} | ETA: {eta}s`,
+        format: sanitizeCliString(`📤 Uploading: ${fileName} |{bar}| {percentage}% | {value}/{total} ${formatFileSize(fileSize)} | ETA: {eta}s`),
         barCompleteChar: '\u2588',
         barIncompleteChar: '\u2591',
         hideCursor: true
@@ -249,7 +275,7 @@ async function uploadMultipleFiles(filePaths, bucketName = DEFAULT_BUCKET, baseS
   
   // Create batch progress bar
   const batchProgressBar = new cliProgress.SingleBar({
-    format: `📦 Batch Upload |{bar}| {percentage}% | {value}/{total} files | ETA: {eta}s`,
+    format: sanitizeCliString(`📦 Batch Upload |{bar}| {percentage}% | {value}/{total} files | ETA: {eta}s`),
     barCompleteChar: '\u2588',
     barIncompleteChar: '\u2591',
     hideCursor: true
@@ -396,7 +422,7 @@ async function downloadFile(storagePath, bucketName = DEFAULT_BUCKET, localPath 
 
     // Create progress bar
     const progressBar = new cliProgress.SingleBar({
-      format: `📥 Downloading |{bar}| {percentage}% | {value}/{total} ${formatFileSize(fileSize)} | ETA: {eta}s`,
+      format: sanitizeCliString(`📥 Downloading |{bar}| {percentage}% | {value}/{total} ${formatFileSize(fileSize)} | ETA: {eta}s`),
       barCompleteChar: '\u2588',
       barIncompleteChar: '\u2591',
       hideCursor: true
@@ -476,7 +502,7 @@ async function downloadMultipleFiles(storagePaths, bucketName = DEFAULT_BUCKET, 
   
   // Create batch progress bar
   const batchProgressBar = new cliProgress.SingleBar({
-    format: `📥 Batch Download |{bar}| {percentage}% | {value}/{total} files | ETA: {eta}s`,
+    format: sanitizeCliString(`📥 Batch Download |{bar}| {percentage}% | {value}/{total} files | ETA: {eta}s`),
     barCompleteChar: '\u2588',
     barIncompleteChar: '\u2591',
     hideCursor: true
@@ -548,31 +574,51 @@ function getContentType(filePath) {
 }
 
 /**
- * List files in a bucket
+ * List files in a bucket with pagination support
  * @param {string} bucketName - Bucket name
  * @param {string} folderPath - Folder path (optional)
+ * @param {number} limit - Max files to fetch (default 1000)
  * @returns {Promise<Array>} List of files
  */
-async function listFiles(bucketName = DEFAULT_BUCKET, folderPath = '') {
+async function listFiles(bucketName = DEFAULT_BUCKET, folderPath = '', limit = 1000) {
   try {
-    const { data, error } = await supabase.storage
-      .from(bucketName)
-      .list(folderPath);
+    // Supabase default limit is 100, so we need to paginate for larger folders
+    const allFiles = [];
+    let offset = 0;
+    const batchSize = 100; // Supabase max per request
 
-    if (error) throw error;
+    while (offset < limit) {
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .list(folderPath, {
+          limit: Math.min(batchSize, limit - offset),
+          offset: offset,
+          sortBy: { column: 'name', order: 'asc' }
+        });
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) break;
+
+      allFiles.push(...data);
+      offset += data.length;
+
+      // If we got fewer than requested, we've reached the end
+      if (data.length < batchSize) break;
+    }
 
     console.log(`📋 Files in bucket '${bucketName}'${folderPath ? ` (${folderPath})` : ''}:`);
-    if (data.length === 0) {
+    if (allFiles.length === 0) {
       console.log('   (empty)');
     } else {
-      data.forEach(file => {
+      allFiles.forEach(file => {
         const size = file.metadata?.size || 0;
         console.log(`   - ${file.name} (${formatFileSize(size)})`);
       });
     }
 
-    logInfo('Files listed', { bucket: bucketName, folderPath, count: data.length });
-    return data;
+    logInfo('Files listed', { bucket: bucketName, folderPath, count: allFiles.length });
+    return allFiles;
   } catch (error) {
     console.error(`❌ Error listing files:`, error.message);
     logError('List files failed', { bucket: bucketName, folderPath, error: error.message });
@@ -623,15 +669,15 @@ async function interactiveMode() {
         name: 'action',
         message: 'What would you like to do?',
         choices: [
-          { name: '📤 Upload File', value: 'upload' },
-          { name: '📤 Upload Multiple Files', value: 'batch-upload' },
-          { name: '📁 Upload Directory', value: 'upload-dir' },
-          { name: '📥 Download File', value: 'download' },
-          { name: '📥 Download Multiple Files', value: 'batch-download' },
-          { name: '📋 List Files', value: 'list' },
-          { name: '🗑️  Delete File', value: 'delete' },
-          { name: '📄 View Log File', value: 'view-log' },
-          { name: '❌ Exit', value: 'exit' }
+          { name: sanitizeCliString('📤 Upload File'), value: 'upload' },
+          { name: sanitizeCliString('📤 Upload Multiple Files'), value: 'batch-upload' },
+          { name: sanitizeCliString('📁 Upload Directory'), value: 'upload-dir' },
+          { name: sanitizeCliString('📥 Download File'), value: 'download' },
+          { name: sanitizeCliString('📥 Download Multiple Files'), value: 'batch-download' },
+          { name: sanitizeCliString('📋 List Files'), value: 'list' },
+          { name: sanitizeCliString('🗑️  Delete File'), value: 'delete' },
+          { name: sanitizeCliString('📄 View Log File'), value: 'view-log' },
+          { name: sanitizeCliString('❌ Exit'), value: 'exit' }
         ]
       }
     ]);
