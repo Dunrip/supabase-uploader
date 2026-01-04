@@ -178,3 +178,63 @@ export function isPreviewable(fileName) {
   ];
   return previewableExtensions.includes(ext);
 }
+
+/**
+ * Get file type category for filtering
+ * @param {string} fileName - File name
+ * @returns {string} Category name (Image, Video, Audio, Document, Archive, Code, Other)
+ */
+export function getFileCategory(fileName) {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  const categories = {
+    // Images
+    jpg: 'Image', jpeg: 'Image', png: 'Image', gif: 'Image',
+    webp: 'Image', svg: 'Image', bmp: 'Image', ico: 'Image',
+    // Videos
+    mp4: 'Video', avi: 'Video', mov: 'Video', wmv: 'Video',
+    flv: 'Video', webm: 'Video', mkv: 'Video',
+    // Audio
+    mp3: 'Audio', wav: 'Audio', ogg: 'Audio', flac: 'Audio',
+    // Documents
+    pdf: 'Document', doc: 'Document', docx: 'Document',
+    txt: 'Document', rtf: 'Document',
+    // Spreadsheets
+    xlsx: 'Spreadsheet', xls: 'Spreadsheet', csv: 'Spreadsheet',
+    // Archives
+    zip: 'Archive', rar: 'Archive', '7z': 'Archive',
+    tar: 'Archive', gz: 'Archive',
+    // Code
+    js: 'Code', ts: 'Code', jsx: 'Code', tsx: 'Code',
+    html: 'Code', css: 'Code', json: 'Code', xml: 'Code',
+    py: 'Code', java: 'Code', cpp: 'Code', c: 'Code',
+    php: 'Code', rb: 'Code', go: 'Code', rs: 'Code',
+  };
+  return categories[ext] || 'Other';
+}
+
+/**
+ * Available file type categories for filtering
+ */
+export const FILE_CATEGORIES = [
+  'All',
+  'Image',
+  'Video',
+  'Audio',
+  'Document',
+  'Spreadsheet',
+  'Archive',
+  'Code',
+  'Other',
+];
+
+/**
+ * Available sort options
+ */
+export const SORT_OPTIONS = [
+  { value: 'name-asc', label: 'Name (A-Z)' },
+  { value: 'name-desc', label: 'Name (Z-A)' },
+  { value: 'date-desc', label: 'Date (Newest)' },
+  { value: 'date-asc', label: 'Date (Oldest)' },
+  { value: 'size-desc', label: 'Size (Largest)' },
+  { value: 'size-asc', label: 'Size (Smallest)' },
+];

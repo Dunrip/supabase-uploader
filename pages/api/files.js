@@ -1,63 +1,100 @@
 import { listFiles, deleteFile } from '../../uploadToSupabase';
 import { formatFileSize } from '../../utils/clientHelpers';
 import { getDefaultBucket } from '../../utils/serverHelpers';
+import { validateMethod, validateQueryParams, sendSuccess, sendError } from '../../utils/apiHelpers';
+import { validateStoragePath, validateBucketName } from '../../utils/security';
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
+      // Validate bucket name
       const bucketName = req.query.bucket || getDefaultBucket();
-      const folderPath = req.query.folder || '';
+      const bucketValidation = validateBucketName(bucketName);
+      if (!bucketValidation.valid) {
+        return sendError(res, bucketValidation.error, 400);
+      }
 
-      const files = await listFiles(bucketName, folderPath);
+      // Validate folder path if provided
+      let folderPath = '';
+      if (req.query.folder) {
+        const pathValidation = validateStoragePath(req.query.folder);
+        if (!pathValidation.valid) {
+          return sendError(res, pathValidation.error, 400);
+        }
+        folderPath = pathValidation.sanitized;
+      }
 
-      const formattedFiles = files.map(file => ({
-        name: file.name,
-        size: file.metadata?.size || 0,
-        sizeFormatted: formatFileSize(file.metadata?.size || 0),
-        updatedAt: file.updated_at,
-        createdAt: file.created_at,
-        path: folderPath ? `${folderPath}/${file.name}` : file.name,
-      }));
+      const items = await listFiles(bucketName, folderPath);
 
-      res.json({
-        success: true,
-        files: formattedFiles,
+      // Separate folders and files
+      const folders = [];
+      const files = [];
+
+      items.forEach(item => {
+        // In Supabase, folders have id: null
+        if (item.id === null) {
+          // It's a folder
+          folders.push({
+            name: item.name,
+            isFolder: true,
+            path: folderPath ? `${folderPath}/${item.name}` : item.name,
+            updatedAt: item.updated_at,
+            createdAt: item.created_at,
+          });
+        } else {
+          // It's a file - skip .folder placeholder files
+          if (item.name !== '.folder') {
+            files.push({
+              name: item.name,
+              isFolder: false,
+              size: item.metadata?.size || 0,
+              sizeFormatted: formatFileSize(item.metadata?.size || 0),
+              updatedAt: item.updated_at,
+              createdAt: item.created_at,
+              path: folderPath ? `${folderPath}/${item.name}` : item.name,
+            });
+          }
+        }
+      });
+
+      sendSuccess(res, {
+        folders,
+        files,
         bucket: bucketName,
         folder: folderPath,
       });
     } catch (error) {
       console.error('❌ Error listing files:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to list files',
-      });
+      sendError(res, error.message || 'Failed to list files', 500);
     }
   } else if (req.method === 'DELETE') {
     try {
-      const storagePath = req.query.path;
-      const bucketName = req.query.bucket || getDefaultBucket();
+      if (!validateQueryParams(req, res, ['path'])) return;
 
-      if (!storagePath) {
-        return res.status(400).json({
-          success: false,
-          error: 'Storage path required',
-        });
+      // Validate storage path (prevent path traversal)
+      const pathValidation = validateStoragePath(req.query.path);
+      if (!pathValidation.valid) {
+        return sendError(res, pathValidation.error, 400);
+      }
+      const storagePath = pathValidation.sanitized;
+
+      // Validate bucket name
+      const bucketName = req.query.bucket || getDefaultBucket();
+      const bucketValidation = validateBucketName(bucketName);
+      if (!bucketValidation.valid) {
+        return sendError(res, bucketValidation.error, 400);
       }
 
       const success = await deleteFile(storagePath, bucketName);
 
-      res.json({
-        success,
+      sendSuccess(res, {
         message: success ? 'File deleted successfully' : 'Failed to delete file',
       });
     } catch (error) {
       console.error('Delete error:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
+      sendError(res, error.message, 500);
     }
   } else {
-    res.status(405).json({ success: false, error: 'Method not allowed' });
+    validateMethod(req, res, ['GET', 'DELETE']);
   }
 }

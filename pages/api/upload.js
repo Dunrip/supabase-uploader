@@ -1,6 +1,8 @@
 import { IncomingForm } from 'formidable';
 import { uploadFile, listFiles } from '../../uploadToSupabase';
 import { getTempDir, getDefaultBucket, cleanupTempFile, withTimeout } from '../../utils/serverHelpers';
+import { validateMethod, sendSuccess, sendError } from '../../utils/apiHelpers';
+import { validateStoragePath, validateBucketName, validateFileType, validateFilename } from '../../utils/security';
 
 export const config = {
   api: {
@@ -40,9 +42,7 @@ function generateUniqueFileName(fileName, existingFiles) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
-  }
+  if (!validateMethod(req, res, 'POST')) return;
 
   let uploadedFile = null;
 
@@ -61,13 +61,43 @@ export default async function handler(req, res) {
     const file = Array.isArray(files.file) ? files.file[0] : files.file;
 
     if (!file) {
-      return res.status(400).json({ success: false, error: 'No file provided' });
+      return sendError(res, 'No file provided', 400);
     }
 
     uploadedFile = file;
 
+    // Validate filename
+    const filenameValidation = validateFilename(file.originalFilename);
+    if (!filenameValidation.valid) {
+      cleanupTempFile(file.filepath);
+      return sendError(res, filenameValidation.error, 400);
+    }
+
+    // Validate file type (magic bytes check)
+    const fileTypeValidation = await validateFileType(file.filepath, file.originalFilename);
+    if (!fileTypeValidation.valid) {
+      cleanupTempFile(file.filepath);
+      return sendError(res, fileTypeValidation.error, 400);
+    }
+
+    // Validate bucket name
     const bucketName = fields.bucket?.[0] || getDefaultBucket();
+    const bucketValidation = validateBucketName(bucketName);
+    if (!bucketValidation.valid) {
+      cleanupTempFile(file.filepath);
+      return sendError(res, bucketValidation.error, 400);
+    }
+
+    // Validate and sanitize storage path
     let storagePath = fields.path?.[0] || file.originalFilename || null;
+    if (fields.path?.[0]) {
+      const pathValidation = validateStoragePath(fields.path[0]);
+      if (!pathValidation.valid) {
+        cleanupTempFile(file.filepath);
+        return sendError(res, pathValidation.error, 400);
+      }
+      storagePath = pathValidation.sanitized;
+    }
     
     // Check for duplicate filenames and rename if necessary
     if (storagePath && !fields.path?.[0]) {
@@ -98,17 +128,14 @@ export default async function handler(req, res) {
       throw new Error(result?.error || 'Upload failed');
     }
 
-    res.json(result);
+    sendSuccess(res, result);
   } catch (error) {
     console.error(`❌ Upload failed:`, error);
-    
+
     if (uploadedFile?.filepath) {
       cleanupTempFile(uploadedFile.filepath);
     }
-    
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Upload failed. Please check server logs.',
-    });
+
+    sendError(res, error.message || 'Upload failed. Please check server logs.', 500);
   }
 }

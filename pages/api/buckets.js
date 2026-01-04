@@ -1,10 +1,9 @@
 import { getSupabaseClient } from '../../utils/supabaseClient';
 import { getDefaultBucket } from '../../utils/serverHelpers';
+import { validateMethod, sendSuccess, sendError } from '../../utils/apiHelpers';
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
-  }
+  if (!validateMethod(req, res, 'GET')) return;
 
   try {
     const supabase = getSupabaseClient();
@@ -13,8 +12,7 @@ export default async function handler(req, res) {
 
     if (error) throw error;
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       buckets: buckets.map(b => ({
         name: b.name,
         id: b.id,
@@ -25,9 +23,6 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('❌ Error listing buckets:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to list buckets',
-    });
+    sendError(res, error.message || 'Failed to list buckets', 500);
   }
 }

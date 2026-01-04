@@ -1,20 +1,18 @@
 import path from 'path';
 import fs from 'fs';
+import { validateMethod, sendSuccess, sendError } from '../../utils/apiHelpers';
 
 const LOG_FILE = process.env.LOG_FILE || 'supabase-uploader.log';
 const MAX_LOG_LINES = 50;
 
 export default function handler(req, res) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
-  }
+  if (!validateMethod(req, res, 'GET')) return;
 
   try {
     const logPath = path.join(process.cwd(), LOG_FILE);
 
     if (!fs.existsSync(logPath)) {
-      return res.json({
-        success: true,
+      return sendSuccess(res, {
         logs: [],
         message: 'No log file found',
       });
@@ -24,16 +22,12 @@ export default function handler(req, res) {
     const lines = logContent.split('\n').filter(l => l.trim());
     const lastLines = lines.slice(-MAX_LOG_LINES);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       logs: lastLines,
       totalLines: lines.length,
     });
   } catch (error) {
     console.error('❌ Error reading logs:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to read logs',
-    });
+    sendError(res, error.message || 'Failed to read logs', 500);
   }
 }

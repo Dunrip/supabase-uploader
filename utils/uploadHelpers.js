@@ -10,12 +10,19 @@
  * @param {Function} onProgress - Progress callback (progress: number) => void
  * @param {Function} onSuccess - Success callback (response: object) => void
  * @param {Function} onError - Error callback (error: string) => void
+ * @param {string} folderPath - Optional folder path to upload to
  * @returns {XMLHttpRequest} The XHR object for potential cancellation
  */
-export function uploadFileWithProgress(file, bucket, onProgress, onSuccess, onError) {
+export function uploadFileWithProgress(file, bucket, onProgress, onSuccess, onError, folderPath = '') {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('bucket', bucket);
+
+  // If a folder path is provided, set the full path for the file
+  if (folderPath) {
+    const fullPath = `${folderPath}/${file.name}`;
+    formData.append('path', fullPath);
+  }
 
   const xhr = new XMLHttpRequest();
 

@@ -1,20 +1,25 @@
 import path from 'path';
 import { getSupabaseClient } from '../../utils/supabaseClient';
 import { getDefaultBucket } from '../../utils/serverHelpers';
+import { validateMethod, validateQueryParams, sendError } from '../../utils/apiHelpers';
+import { validateStoragePath, validateBucketName } from '../../utils/security';
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+  if (!validateMethod(req, res, 'GET')) return;
+  if (!validateQueryParams(req, res, ['path'])) return;
+
+  // Validate storage path (prevent path traversal)
+  const pathValidation = validateStoragePath(req.query.path);
+  if (!pathValidation.valid) {
+    return sendError(res, pathValidation.error, 400);
   }
+  const storagePath = pathValidation.sanitized;
 
-  const storagePath = req.query.path;
+  // Validate bucket name
   const bucketName = req.query.bucket || getDefaultBucket();
-
-  if (!storagePath) {
-    return res.status(400).json({
-      success: false,
-      error: 'Storage path required',
-    });
+  const bucketValidation = validateBucketName(bucketName);
+  if (!bucketValidation.valid) {
+    return sendError(res, bucketValidation.error, 400);
   }
 
   try {
@@ -27,33 +32,21 @@ export default async function handler(req, res) {
 
     if (error) {
       console.error('Preview download error:', error);
-      
+
       // Provide more specific error messages
       if (error.message && error.message.includes('Bucket not found')) {
-        return res.status(404).json({
-          success: false,
-          error: `Bucket "${bucketName}" not found. Please check the bucket name.`,
-        });
+        return sendError(res, `Bucket "${bucketName}" not found. Please check the bucket name.`, 404);
       }
-      
+
       if (error.message && (error.message.includes('Object not found') || error.message.includes('not found'))) {
-        return res.status(404).json({
-          success: false,
-          error: `File "${storagePath}" not found in bucket "${bucketName}"`,
-        });
+        return sendError(res, `File "${storagePath}" not found in bucket "${bucketName}"`, 404);
       }
-      
-      return res.status(404).json({
-        success: false,
-        error: error.message || 'File not found',
-      });
+
+      return sendError(res, error.message || 'File not found', 404);
     }
 
     if (!data) {
-      return res.status(404).json({
-        success: false,
-        error: 'File not found',
-      });
+      return sendError(res, 'File not found', 404);
     }
 
     // Get file extension to determine content type
@@ -82,18 +75,21 @@ export default async function handler(req, res) {
     const arrayBuffer = await data.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    // Properly escape filename for Content-Disposition header
+    // RFC 5987: Use both filename and filename* for maximum compatibility
+    const fileName = path.basename(storagePath);
+    const safeFileName = fileName.replace(/"/g, '\\"').replace(/\n/g, '');
+    const encodedFileName = encodeURIComponent(fileName);
+
     // Set headers for inline display
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', buffer.length);
     res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.setHeader('Content-Disposition', `inline; filename="${path.basename(storagePath)}"`);
+    res.setHeader('Content-Disposition', `inline; filename="${safeFileName}"; filename*=UTF-8''${encodedFileName}`);
 
     res.send(buffer);
   } catch (error) {
     console.error('Preview error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to preview file',
-    });
+    sendError(res, error.message || 'Failed to preview file', 500);
   }
 }

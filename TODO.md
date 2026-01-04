@@ -3,28 +3,33 @@
 ## Security Improvements (Critical)
 
 ### High Priority
-- [ ] **Rate Limiting** - Add rate limiting middleware to prevent API abuse
-  - Consider using `next-rate-limit` or Vercel Edge middleware
-  - Limit: ~100 requests/minute per IP for uploads
+- [x] **Rate Limiting** - Add rate limiting middleware to prevent API abuse
+  - ✅ Implemented in `middleware.js` with in-memory rate limiter
+  - ✅ Configurable limits per endpoint (uploads: 20/min, downloads: 100/min)
+  - ✅ Returns 429 with Retry-After header when exceeded
 
-- [ ] **Path Traversal Protection** - Validate storage paths
-  - Reject paths containing `../` or absolute paths
-  - Sanitize all user-provided path inputs
+- [x] **Path Traversal Protection** - Validate storage paths
+  - ✅ Implemented in `utils/security.js`
+  - ✅ Rejects `../`, absolute paths, URL-encoded attacks, null bytes
+  - ✅ Integrated into all API routes (upload, download, files, preview)
 
-- [ ] **File Type Validation** - Server-side MIME verification
-  - Verify magic bytes, not just file extension
-  - Create allowlist of permitted file types
-  - Block executable files (.exe, .sh, .bat, .cmd, .ps1)
+- [x] **File Type Validation** - Server-side MIME verification
+  - ✅ Implemented in `utils/security.js` with magic byte checking
+  - ✅ Validates images, documents, archives, audio, video
+  - ✅ Blocks executables (.exe, .sh, .bat, .cmd, .ps1, .php, etc.)
 
-- [ ] **Security Headers** - Add CSP headers in `next.config.js`
-  - X-Content-Type-Options: nosniff
-  - X-Frame-Options: DENY
-  - X-XSS-Protection: 1; mode=block
-  - Content-Security-Policy
+- [x] **Security Headers** - Add CSP headers in `next.config.js`
+  - ✅ X-Content-Type-Options: nosniff
+  - ✅ X-Frame-Options: DENY
+  - ✅ X-XSS-Protection: 1; mode=block
+  - ✅ Content-Security-Policy (restrictive)
+  - ✅ Referrer-Policy, Permissions-Policy
 
-- [ ] **Environment Validation** - Startup checks for required env vars
-  - Fail fast if SUPABASE_URL or SUPABASE_KEY missing
-  - Validate URL format
+- [x] **Environment Validation** - Startup checks for required env vars
+  - ✅ Implemented in `utils/envValidation.js`
+  - ✅ Validates SUPABASE_URL format (must be valid URL)
+  - ✅ Validates SUPABASE_KEY format (JWT structure)
+  - ✅ Fails fast on first Supabase client usage
 
 ### Medium Priority
 - [ ] **Authentication** - Add user authentication
@@ -32,10 +37,10 @@
   - Option B: NextAuth.js
   - Option C: Simple API key for single-user deployment
 
-- [ ] **Input Sanitization** - Stricter validation
-  - Bucket name regex validation
-  - File path character restrictions
-  - Maximum filename length enforcement
+- [x] **Input Sanitization** - Stricter validation
+  - ✅ Bucket name regex validation (alphanumeric, hyphens, underscores)
+  - ✅ File path character restrictions (no traversal, null bytes)
+  - ✅ Maximum filename length enforcement (255 chars)
 
 - [ ] **CORS Configuration** - Proper cross-origin settings
   - Configure allowed origins for production
@@ -45,52 +50,80 @@
 
 ## Bug Fixes
 
-- [ ] **Enable TypeScript Strict Mode** - `tsconfig.json` has `strict: false`
-  - Enable strict mode for better type safety
-  - Fix any resulting type errors
+- [x] **Enable TypeScript Strict Mode** - `tsconfig.json` has `strict: false`
+  - ✅ Already enabled in `tsconfig.json` (`strict: true`)
 
-- [ ] **Standardize Error Responses** - Inconsistent formats
-  - Some return `{ error }`, others `{ success: false, error }`
-  - Create unified error response helper
+- [x] **Improve Rename Button**
+  - ✅ Removed yellow rename button
+  - ✅ Added pencil icon next to filename (Apple style, appears on hover)
+  - ✅ Fixed input box sizing - scales with filename length (min 100px, max 400px)
+  - ✅ Compact save/cancel buttons with icons
 
-- [ ] **Temp File Cleanup** - Race condition in async cleanup
-  - Add retry logic for failed deletions
-  - Log cleanup failures for debugging
+- [x] **Fix in directory upload path**
+  - ✅ Added `folderPath` parameter to `uploadFileWithProgress()` in `uploadHelpers.js`
+  - ✅ Files now upload to current folder when inside a subdirectory
+  - ✅ Changing bucket resets path to root via `handleBucketChange()`
 
-- [ ] **Large File Streaming** - Memory issues
-  - Downloads currently load entire file into memory
-  - Implement proper streaming for files > 50MB
+- [x] **Loading States** - Missing UI feedback
+  - ✅ Skeleton loaders during file list fetch
+  - ✅ Loading indicator on bucket switch
 
-- [ ] **Loading States** - Missing UI feedback
-  - Add skeleton loaders during file list fetch
-  - Show loading indicator on bucket switch
+- [x] **Standardize Error Responses** - Inconsistent formats
+  - ✅ Created unified error response helper in `utils/apiHelpers.js`
+  - ✅ All API routes now use `sendSuccess()` and `sendError()` functions
+  - ✅ Consistent `{ success: true/false, error?: string }` format
+
+- [x] **Temp File Cleanup** - Race condition in async cleanup
+  - ✅ Added retry logic with configurable attempts (default: 3)
+  - ✅ Cleanup failures are logged for debugging
+  - ✅ Both sync and async versions available in `serverHelpers.js`
+
+- [x] **Large File Streaming** - Memory issues
+  - ✅ Downloads use streaming for files > 50MB threshold
+  - ✅ Implemented in `pages/api/download.js` with Readable stream
+
+- [x] **Content-Disposition Header Escaping** - Security fix
+  - ✅ Both download.js and preview.js now properly escape filenames
+  - ✅ RFC 5987 compliant with `filename` and `filename*` parameters
+  - ✅ Handles quotes, newlines, and special characters
 
 ---
 
 ## Features - High Priority (Deployment Ready)
 
-- [ ] **Health Check Endpoint** - `/api/health`
-  - Return server status, Supabase connection status
-  - Useful for monitoring and load balancers
+- [x] **Health Check Endpoint** - `/api/health`
+  - ✅ Returns server status, Supabase connection status
+  - ✅ Includes response time, uptime, bucket count
 
-- [ ] **Folder Management**
-  - Create empty folders
-  - Move files between folders
-  - Delete folders recursively
+- [x] **Folder Management**
+  - ✅ Create empty folders (with .folder placeholder)
+  - ✅ Move files between folders
+  - ✅ Delete folders recursively
+  - ✅ Breadcrumb navigation with up button
+  - ✅ Folders shown separately from files
+  - ✅ Click folder to navigate into it
 
-- [ ] **Bulk Operations**
-  - Select multiple files with checkboxes
-  - Bulk delete selected files
-  - Bulk download as zip
+- [x] **Bulk Operations**
+  - ✅ Select multiple files with checkboxes
+  - ✅ Select all / deselect all
+  - ✅ Bulk delete selected files with confirmation
+  - ✅ Bulk download as zip (using archiver)
+  - ✅ Selection indicator bar with count and actions
+  - ✅ Max 100 files, 500MB total size limit for bulk download
 
-- [ ] **Search & Filter**
-  - Search files by name
-  - Filter by file type
-  - Sort by date, size, name
+- [x] **Search & Filter**
+  - ✅ Search files by name with clear button
+  - ✅ Filter by file type categories (Image, Video, Audio, Document, Spreadsheet, Archive, Code)
+  - ✅ Sort by date (newest/oldest), size (largest/smallest), name (A-Z/Z-A)
+  - ✅ Category counts shown as badges
+  - ✅ Clear filters buttons when no results
 
-- [ ] **Rename Files** - Currently not possible
-  - Rename in place
-  - Handle name conflicts
+- [x] **Rename Files**
+  - ✅ Inline rename with input field
+  - ✅ Enter to save, Escape to cancel
+  - ✅ Conflict detection (409 error if name exists)
+  - ✅ Validation for filename characters
+  - ✅ API endpoint with copy-delete pattern (Supabase limitation)
 
 ---
 
@@ -166,13 +199,16 @@
 
 ```
 Pre-Deployment:
-[ ] Rate limiting implemented
-[ ] Security headers configured
-[ ] Path traversal protection added
-[ ] Environment validation on startup
-[ ] Health check endpoint working
-[ ] TypeScript strict mode enabled
-[ ] Error responses standardized
+[x] Rate limiting implemented
+[x] Security headers configured
+[x] Path traversal protection added
+[x] Environment validation on startup
+[x] Health check endpoint working
+[x] Error responses standardized (apiHelpers.js)
+[x] Content-Disposition header escaping (RFC 5987)
+[x] File type validation with magic bytes
+[x] Temp file cleanup with retry logic
+[x] TypeScript strict mode enabled
 [ ] Basic tests passing
 
 Deployment:
