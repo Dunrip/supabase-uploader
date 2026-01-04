@@ -11,9 +11,10 @@
  * @param {Function} onSuccess - Success callback (response: object) => void
  * @param {Function} onError - Error callback (error: string) => void
  * @param {string} folderPath - Optional folder path to upload to
+ * @param {string} accessToken - Optional access token for authentication
  * @returns {XMLHttpRequest} The XHR object for potential cancellation
  */
-export function uploadFileWithProgress(file, bucket, onProgress, onSuccess, onError, folderPath = '') {
+export function uploadFileWithProgress(file, bucket, onProgress, onSuccess, onError, folderPath = '', accessToken = null) {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('bucket', bucket);
@@ -36,7 +37,7 @@ export function uploadFileWithProgress(file, bucket, onProgress, onSuccess, onEr
   xhr.addEventListener('load', () => {
     try {
       let errorMessage = 'Upload failed';
-      
+
       // Try to parse error response even if status is not 200
       if (xhr.responseText) {
         try {
@@ -92,6 +93,12 @@ export function uploadFileWithProgress(file, bucket, onProgress, onSuccess, onEr
   });
 
   xhr.open('POST', '/api/upload');
+
+  // Set authorization header if token is provided
+  if (accessToken) {
+    xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+  }
+
   xhr.send(formData);
 
   return xhr;

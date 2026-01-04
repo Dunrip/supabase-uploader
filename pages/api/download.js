@@ -1,16 +1,22 @@
 import path from 'path';
 import { Readable } from 'stream';
-import { getSupabaseClient } from '../../utils/supabaseClient';
-import { getDefaultBucket } from '../../utils/serverHelpers';
 import { validateMethod, validateQueryParams, sendError } from '../../utils/apiHelpers';
 import { validateStoragePath, validateBucketName } from '../../utils/security';
+import { withAuth } from '../../utils/authMiddleware.js';
+import { createStorageClientWithErrorHandling } from '../../utils/storageClientFactory.js';
 
 // File size threshold for streaming vs temp file (50MB)
 const STREAMING_THRESHOLD = 50 * 1024 * 1024;
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (!validateMethod(req, res, 'GET')) return;
   if (!validateQueryParams(req, res, ['path'])) return;
+
+  // Get user's storage client
+  const storageResult = await createStorageClientWithErrorHandling(req, res);
+  if (!storageResult) return;
+
+  const { client: supabase, settings } = storageResult;
 
   // Validate storage path (prevent path traversal)
   const pathValidation = validateStoragePath(req.query.path);
@@ -20,7 +26,7 @@ export default async function handler(req, res) {
   const storagePath = pathValidation.sanitized;
 
   // Validate bucket name
-  const bucketName = req.query.bucket || getDefaultBucket();
+  const bucketName = req.query.bucket || settings.default_bucket || 'files';
   const bucketValidation = validateBucketName(bucketName);
   if (!bucketValidation.valid) {
     return sendError(res, bucketValidation.error, 400);
@@ -29,7 +35,6 @@ export default async function handler(req, res) {
   const fileName = path.basename(storagePath);
 
   try {
-    const supabase = getSupabaseClient();
 
     // Download file from Supabase
     const { data, error } = await supabase.storage
@@ -83,3 +88,5 @@ export default async function handler(req, res) {
     }
   }
 }
+
+export default withAuth(handler);

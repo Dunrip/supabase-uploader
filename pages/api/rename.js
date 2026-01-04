@@ -1,11 +1,17 @@
 import path from 'path';
-import { getSupabaseClient } from '../../utils/supabaseClient';
-import { getDefaultBucket } from '../../utils/serverHelpers';
 import { validateMethod, sendError, sendSuccess } from '../../utils/apiHelpers';
 import { validateStoragePath, validateBucketName, validateFilename } from '../../utils/security';
+import { withAuth } from '../../utils/authMiddleware.js';
+import { createStorageClientWithErrorHandling } from '../../utils/storageClientFactory.js';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (!validateMethod(req, res, 'POST')) return;
+
+  // Get user's storage client
+  const storageResult = await createStorageClientWithErrorHandling(req, res);
+  if (!storageResult) return;
+
+  const { client: supabase, settings } = storageResult;
 
   const { oldPath, newName, bucket } = req.body;
 
@@ -30,7 +36,7 @@ export default async function handler(req, res) {
   }
 
   // Validate bucket name
-  const bucketName = bucket || getDefaultBucket();
+  const bucketName = bucket || settings.default_bucket || 'files';
   const bucketValidation = validateBucketName(bucketName);
   if (!bucketValidation.valid) {
     return sendError(res, bucketValidation.error, 400);
@@ -55,8 +61,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    const supabase = getSupabaseClient();
-
     // Check if a file with the new name already exists
     const { data: existingFile } = await supabase.storage
       .from(bucketName)
@@ -124,3 +128,5 @@ export default async function handler(req, res) {
     return sendError(res, error.message || 'Failed to rename file', 500);
   }
 }
+
+export default withAuth(handler);

@@ -32,10 +32,19 @@
   - ✅ Fails fast on first Supabase client usage
 
 ### Medium Priority
-- [ ] **Authentication** - Add user authentication
-  - Option A: Supabase Auth (recommended - native integration)
-  - Option B: NextAuth.js
-  - Option C: Simple API key for single-user deployment
+- [x] **Authentication** - Add user authentication
+  - ✅ Implemented Supabase Auth for email/password login
+  - ✅ JWT token verification on all protected API routes
+  - ✅ Auth context with signIn/signUp/signOut methods
+  - ✅ Login/register page with form validation
+  - ✅ Session persistence with auto-refresh
+
+- [x] **Multi-User Support** - Per-user Supabase configuration
+  - ✅ Each user configures their own Supabase storage project
+  - ✅ Settings modal for configuring Supabase URL and API key
+  - ✅ Test connection before saving
+  - ✅ Encrypted API key storage (AES-256-GCM)
+  - ✅ Storage client factory creates clients with user's credentials
 
 - [x] **Input Sanitization** - Stricter validation
   - ✅ Bucket name regex validation (alphanumeric, hyphens, underscores)

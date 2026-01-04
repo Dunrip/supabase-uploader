@@ -1,11 +1,17 @@
 import path from 'path';
-import { getSupabaseClient } from '../../utils/supabaseClient';
-import { getDefaultBucket } from '../../utils/serverHelpers';
 import { validateMethod, sendSuccess, sendError } from '../../utils/apiHelpers';
 import { validateStoragePath, validateBucketName } from '../../utils/security';
+import { withAuth } from '../../utils/authMiddleware.js';
+import { createStorageClientWithErrorHandling } from '../../utils/storageClientFactory.js';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (!validateMethod(req, res, 'POST')) return;
+
+  // Get user's storage client
+  const storageResult = await createStorageClientWithErrorHandling(req, res);
+  if (!storageResult) return;
+
+  const { client: supabase, settings } = storageResult;
 
   const { sourcePath, destinationFolder, bucket } = req.body;
 
@@ -30,7 +36,7 @@ export default async function handler(req, res) {
   }
 
   // Validate bucket
-  const bucketName = bucket || getDefaultBucket();
+  const bucketName = bucket || settings.default_bucket || 'files';
   const bucketValidation = validateBucketName(bucketName);
   if (!bucketValidation.valid) {
     return sendError(res, bucketValidation.error, 400);
@@ -50,7 +56,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    const supabase = getSupabaseClient();
 
     // Check if file with same name already exists at destination
     const destFolder = sanitizedDestFolder || '';
@@ -115,3 +120,5 @@ export default async function handler(req, res) {
     return sendError(res, error.message || 'Failed to move file', 500);
   }
 }
+
+export default withAuth(handler);

@@ -37,7 +37,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",                  // Required for Tailwind
               "img-src 'self' data: blob:",                        // Allow images and previews
               "font-src 'self'",
-              "connect-src 'self'",                                // API calls
+              "connect-src 'self' https://*.supabase.co",        // API calls + Supabase auth
               "media-src 'self' blob:",                            // Audio/video previews
               "object-src 'none'",
               "frame-ancestors 'none'",
