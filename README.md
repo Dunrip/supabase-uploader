@@ -43,6 +43,7 @@ A beautiful dark-themed web interface for managing files in Supabase Storage. Ea
 - ✅ **Bulk Operations** - Select multiple files for download (ZIP) or delete
 - 📄 **File Preview** - Preview images, videos, PDFs, and audio files
 - 📊 **Activity Logs** - View application logs in real-time
+- 📱 **Mobile Responsive** - Touch-friendly UI with 44px targets
 - ⚙️ **CLI Tool** - Command-line interface for automation
 
 ## 🏗️ Architecture
