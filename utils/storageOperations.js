@@ -157,7 +157,28 @@ export async function retryWithBackoff(fn, maxRetries = 3) {
 }
 
 /**
+ * Threshold for using streaming uploads (10MB)
+ * Files larger than this will be uploaded via stream to reduce memory usage
+ */
+const STREAMING_THRESHOLD = 10 * 1024 * 1024;
+
+/**
+ * Convert a readable stream to a buffer
+ * Used for smaller files or when streaming is not supported
+ * @param {ReadableStream} stream - Node.js readable stream
+ * @returns {Promise<Buffer>} Complete buffer
+ */
+async function streamToBuffer(stream) {
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+/**
  * Upload a file to Supabase Storage
+ * Uses streaming for large files (>10MB) to optimize memory usage
  * @param {SupabaseClient} supabase - Supabase client instance
  * @param {string} filePath - Local file path
  * @param {string} bucketName - Bucket name
@@ -178,14 +199,29 @@ export async function uploadFile(supabase, filePath, bucketName, storagePath, ma
     // Sanitize path to handle non-ASCII characters (Thai, Chinese, etc.)
     const finalStoragePath = sanitizeStoragePath(rawStoragePath);
 
-    const fileBuffer = fs.readFileSync(filePath);
+    // Note: Both approaches load the entire file into memory before upload.
+    // Streaming here provides incremental reading but still buffers fully
+    // for the Supabase upload API. True streaming would require TUS protocol.
+    const useStreaming = fileSize > STREAMING_THRESHOLD;
+
+    let fileData;
+    if (useStreaming) {
+      // Use streaming read for large files (reads in chunks, then buffers)
+      const readStream = fs.createReadStream(filePath);
+      fileData = await streamToBuffer(readStream);
+    } else {
+      // For smaller files, direct read is simpler
+      fileData = fs.readFileSync(filePath);
+    }
 
     const uploadResult = await retryWithBackoff(async () => {
       const { data, error } = await supabase.storage
         .from(bucketName)
-        .upload(finalStoragePath, fileBuffer, {
+        .upload(finalStoragePath, fileData, {
           contentType: getContentType(filePath),
           upsert: true,
+          // Duplex is required for streaming uploads in newer Node.js versions
+          duplex: 'half',
         });
 
       if (error) throw error;

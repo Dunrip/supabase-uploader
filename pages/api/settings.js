@@ -6,6 +6,7 @@
 import { withAuth, getUserId } from '../../utils/authMiddleware.js';
 import { getUserSettingsForClient, saveUserSettings } from '../../utils/userSettings.js';
 import { sendSuccess, sendError, validateMethod } from '../../utils/apiHelpers.js';
+import { invalidateClientCache } from '../../utils/storageClientFactory.js';
 
 async function handler(req, res) {
   if (!validateMethod(req, res, ['GET', 'POST'])) return;
@@ -34,6 +35,12 @@ async function handler(req, res) {
         max_retries,
         theme,
       });
+
+      // Invalidate cached Supabase client when credentials are updated
+      // This ensures the new credentials are used on the next request
+      if (supabase_url || supabase_key) {
+        invalidateClientCache(userId);
+      }
 
       // Return client-safe version
       const clientSettings = await getUserSettingsForClient(userId);

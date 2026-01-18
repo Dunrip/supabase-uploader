@@ -593,17 +593,17 @@ export default function FilesTab() {
 
       <div className="space-y-6 animate-fade-in min-h-0 flex flex-col">
         {/* Controls - Row 1: Bucket & Actions */}
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3 flex-wrap">
-            <label className="text-sm font-medium text-dark-textMuted">Bucket:</label>
+        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 sm:items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <label className="text-xs sm:text-sm font-medium text-dark-textMuted">Bucket:</label>
             <select
               value={currentBucket}
               onChange={(e) => handleBucketChange(e.target.value)}
               disabled={loadingBuckets}
-              className="px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text focus:outline-none focus:ring-2 focus:ring-dark-accent focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text text-sm focus:outline-none focus:ring-2 focus:ring-dark-accent focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
             >
               {loadingBuckets ? (
-                <option>Loading buckets...</option>
+                <option>Loading...</option>
               ) : (
                 buckets.map(bucket => (
                   <option key={bucket.name} value={bucket.name}>
@@ -615,26 +615,30 @@ export default function FilesTab() {
             <button
               onClick={loadFiles}
               disabled={loading || !currentBucket}
-              className="px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text hover:bg-dark-surfaceHover hover:border-dark-accent/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 sm:px-4 sm:py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text hover:bg-dark-surfaceHover hover:border-dark-accent/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed min-w-[44px] min-h-[44px] flex items-center justify-center"
+              title="Refresh"
             >
-              {loading ? '⏳ Loading...' : '🔄 Refresh'}
+              <span>{loading ? '⏳' : '🔄'}</span>
+              <span className="hidden sm:inline ml-1">{loading ? 'Loading...' : 'Refresh'}</span>
             </button>
           </div>
 
           {/* Upload & Create Folder Buttons */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => {
                 setShowCreateFolder(true);
                 setTimeout(() => newFolderInputRef.current?.focus(), 50);
               }}
-              className="px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text hover:bg-dark-surfaceHover hover:border-dark-accent/50 transition-all text-sm font-medium flex items-center gap-2"
+              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text hover:bg-dark-surfaceHover hover:border-dark-accent/50 transition-all text-sm font-medium flex items-center justify-center gap-2 min-h-[44px]"
             >
-              📁 New Folder
+              <span>📁</span>
+              <span className="hidden sm:inline">New Folder</span>
+              <span className="sm:hidden">Folder</span>
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2 bg-gradient-to-r from-dark-accent to-purple-600 text-white rounded-lg hover:from-dark-accentHover hover:to-purple-500 transition-all transform hover:scale-105 text-sm font-medium shadow-lg shadow-dark-accent/20 flex items-center gap-2 whitespace-nowrap"
+              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gradient-to-r from-dark-accent to-purple-600 text-white rounded-lg hover:from-dark-accentHover hover:to-purple-500 transition-all text-sm font-medium shadow-lg shadow-dark-accent/20 flex items-center justify-center gap-2 whitespace-nowrap min-h-[44px]"
             >
               📤 Upload
             </button>
@@ -724,21 +728,21 @@ export default function FilesTab() {
         )}
 
         {/* Controls - Row 2: Search, Filter & Sort */}
-        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center flex-shrink-0">
+        <div className="flex flex-col gap-3 flex-shrink-0">
           {/* Search */}
-          <div className="relative flex-1 w-full lg:max-w-sm">
+          <div className="relative w-full">
             <input
               type="text"
               placeholder="Search files..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 pl-10 bg-dark-surface border border-dark-border rounded-lg text-dark-text placeholder-dark-textMuted focus:outline-none focus:ring-2 focus:ring-dark-accent focus:border-transparent"
+              className="w-full px-4 py-2 pl-10 bg-dark-surface border border-dark-border rounded-lg text-dark-text placeholder-dark-textMuted focus:outline-none focus:ring-2 focus:ring-dark-accent focus:border-transparent min-h-[44px] text-sm"
             />
-            <span className="absolute left-3 top-2.5 text-dark-textMuted">🔍</span>
+            <span className="absolute left-3 top-3 text-dark-textMuted">🔍</span>
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-2.5 text-dark-textMuted hover:text-dark-text"
+                className="absolute right-3 top-3 text-dark-textMuted hover:text-dark-text p-1"
                 title="Clear search"
               >
                 ✕
@@ -746,78 +750,81 @@ export default function FilesTab() {
             )}
           </div>
 
-          {/* Filter by Type */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-dark-textMuted">Filter:</span>
-            <div className="flex flex-wrap gap-1">
-              {FILE_CATEGORIES.filter(cat => cat === 'All' || categoryCounts[cat] > 0).map(category => (
-                <button
-                  key={category}
-                  onClick={() => setFilterCategory(category)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filterCategory === category
-                    ? 'bg-dark-accent text-white'
-                    : 'bg-dark-surface border border-dark-border text-dark-textMuted hover:border-dark-accent/50 hover:text-dark-text'
-                    }`}
-                >
-                  {category}
-                  {categoryCounts[category] > 0 && (
-                    <span className={`ml-1.5 px-1.5 py-0.5 rounded text-xs ${filterCategory === category
-                      ? 'bg-white/20'
-                      : 'bg-dark-border'
-                      }`}>
-                      {categoryCounts[category]}
-                    </span>
-                  )}
-                </button>
-              ))}
+          {/* Filter & Sort Row */}
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+            {/* Filter by Type */}
+            <div className="flex items-center gap-2 flex-wrap flex-1">
+              <span className="text-xs sm:text-sm text-dark-textMuted">Filter:</span>
+              <div className="flex flex-wrap gap-1">
+                {FILE_CATEGORIES.filter(cat => cat === 'All' || categoryCounts[cat] > 0).map(category => (
+                  <button
+                    key={category}
+                    onClick={() => setFilterCategory(category)}
+                    className={`px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all min-h-[36px] ${filterCategory === category
+                      ? 'bg-dark-accent text-white'
+                      : 'bg-dark-surface border border-dark-border text-dark-textMuted hover:border-dark-accent/50 hover:text-dark-text'
+                      }`}
+                  >
+                    {category}
+                    {categoryCounts[category] > 0 && (
+                      <span className={`ml-1 sm:ml-1.5 px-1 sm:px-1.5 py-0.5 rounded text-[10px] sm:text-xs ${filterCategory === category
+                        ? 'bg-white/20'
+                        : 'bg-dark-border'
+                        }`}>
+                        {categoryCounts[category]}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Sort */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-dark-textMuted">Sort:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text text-sm focus:outline-none focus:ring-2 focus:ring-dark-accent focus:border-transparent"
-            >
-              {SORT_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            {/* Sort */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs sm:text-sm text-dark-textMuted">Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="flex-1 sm:flex-none px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text text-sm focus:outline-none focus:ring-2 focus:ring-dark-accent focus:border-transparent min-h-[44px]"
+              >
+                {SORT_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
         {/* Bulk Actions Bar - appears when files are selected */}
         {selectedFiles.size > 0 && (
-          <div className="flex items-center justify-between gap-4 p-4 bg-dark-accent/10 border border-dark-accent/30 rounded-xl flex-shrink-0 animate-slide-up">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 bg-dark-accent/10 border border-dark-accent/30 rounded-xl flex-shrink-0 animate-slide-up">
             <div className="flex items-center gap-3">
-              <span className="text-dark-accent font-medium">
+              <span className="text-dark-accent font-medium text-sm sm:text-base">
                 {selectedFiles.size} file{selectedFiles.size > 1 ? 's' : ''} selected
               </span>
               <button
                 onClick={clearSelection}
-                className="text-sm text-dark-textMuted hover:text-dark-text transition-colors"
+                className="text-xs sm:text-sm text-dark-textMuted hover:text-dark-text transition-colors"
               >
-                Clear selection
+                Clear
               </button>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleBulkDownload}
                 disabled={bulkActionLoading}
-                className="px-4 py-2 bg-gradient-to-r from-dark-accent to-purple-600 text-white rounded-lg hover:from-dark-accentHover hover:to-purple-500 transition-all text-sm font-medium shadow-lg shadow-dark-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gradient-to-r from-dark-accent to-purple-600 text-white rounded-lg hover:from-dark-accentHover hover:to-purple-500 transition-all text-sm font-medium shadow-lg shadow-dark-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px]"
               >
-                {bulkActionLoading ? '⏳' : '📦'} Download as ZIP
+                {bulkActionLoading ? '⏳' : '📦'} <span className="hidden sm:inline">Download</span> ZIP
               </button>
               <button
                 onClick={handleBulkDelete}
                 disabled={bulkActionLoading}
-                className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 hover:border-red-500/50 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 hover:border-red-500/50 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px]"
               >
-                {bulkActionLoading ? '⏳' : '🗑️'} Delete Selected
+                {bulkActionLoading ? '⏳' : '🗑️'} Delete
               </button>
             </div>
           </div>
@@ -900,17 +907,17 @@ export default function FilesTab() {
                   {folders.map(folder => (
                     <div
                       key={folder.path}
-                      className="group bg-dark-surface border border-dark-border rounded-xl p-4 hover:border-dark-accent/50 hover:bg-dark-surfaceHover transition-all cursor-pointer"
+                      className="group bg-dark-surface border border-dark-border rounded-xl p-3 sm:p-4 hover:border-dark-accent/50 hover:bg-dark-surfaceHover transition-all cursor-pointer"
                       onClick={() => navigateToFolder(folder.path)}
                     >
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-4 flex-1 min-w-0">
-                          <div className="text-3xl flex-shrink-0">📁</div>
+                      <div className="flex items-center justify-between gap-3 sm:gap-4">
+                        <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                          <div className="text-2xl sm:text-3xl flex-shrink-0">📁</div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-dark-text truncate group-hover:text-dark-accent transition-colors">
+                            <div className="font-medium text-dark-text truncate group-hover:text-dark-accent transition-colors text-sm sm:text-base">
                               {folder.name}
                             </div>
-                            <div className="text-sm text-dark-textMuted mt-1">
+                            <div className="text-xs sm:text-sm text-dark-textMuted mt-1">
                               Folder
                             </div>
                           </div>
@@ -921,9 +928,11 @@ export default function FilesTab() {
                               e.stopPropagation();
                               deleteFolder(folder.path, folder.name);
                             }}
-                            className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 hover:border-red-500/50 transition-all text-sm font-medium"
+                            className="p-2 sm:px-4 sm:py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 hover:border-red-500/50 transition-all text-sm font-medium min-w-[40px] min-h-[40px] flex items-center justify-center"
+                            title="Delete folder"
                           >
-                            🗑️ Delete
+                            <span>🗑️</span>
+                            <span className="hidden sm:inline ml-1">Delete</span>
                           </button>
                         </div>
                       </div>
@@ -961,8 +970,8 @@ export default function FilesTab() {
                     : 'border-dark-border'
                     }`}
                 >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
                       {/* Checkbox */}
                       <input
                         type="checkbox"
@@ -970,11 +979,11 @@ export default function FilesTab() {
                         onChange={() => toggleFileSelection(file.path)}
                         className="w-5 h-5 rounded border-dark-border bg-dark-surface text-dark-accent focus:ring-dark-accent focus:ring-offset-0 cursor-pointer flex-shrink-0"
                       />
-                      <div className="text-3xl flex-shrink-0">{getFileIcon(file.name)}</div>
+                      <div className="text-2xl sm:text-3xl flex-shrink-0">{getFileIcon(file.name)}</div>
                       <div className="flex-1 min-w-0">
                         {renamingFile?.path === file.path ? (
                           /* Rename Input - Apple style inline editing */
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <input
                               ref={renameInputRef}
                               type="text"
@@ -988,10 +997,7 @@ export default function FilesTab() {
                                 }
                               }}
                               disabled={renameLoading}
-                              className="px-2 py-1 bg-dark-bg border border-dark-accent rounded text-dark-text text-sm focus:outline-none focus:ring-2 focus:ring-dark-accent disabled:opacity-50"
-                              style={{
-                                width: `${Math.max(100, Math.min(400, renameValue.length * 8 + 24))}px`
-                              }}
+                              className="flex-1 min-w-0 px-2 py-1 bg-dark-bg border border-dark-accent rounded text-dark-text text-sm focus:outline-none focus:ring-2 focus:ring-dark-accent disabled:opacity-50"
                               placeholder="Enter name..."
                             />
                             <button
@@ -1023,7 +1029,7 @@ export default function FilesTab() {
                           /* Normal Display */
                           <>
                             <div className="font-medium text-dark-text truncate group-hover:text-dark-accent transition-colors flex items-center gap-2">
-                              <span className="truncate">{file.name}</span>
+                              <span className="truncate text-sm sm:text-base">{file.name}</span>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1037,10 +1043,10 @@ export default function FilesTab() {
                                 </svg>
                               </button>
                             </div>
-                            <div className="text-sm text-dark-textMuted mt-1 flex items-center gap-3 flex-wrap">
+                            <div className="text-xs sm:text-sm text-dark-textMuted mt-1 flex items-center gap-2 sm:gap-3 flex-wrap">
                               <span>{file.sizeFormatted}</span>
-                              <span>•</span>
-                              <span>{getFileType(file.name)}</span>
+                              <span className="hidden sm:inline">•</span>
+                              <span className="hidden sm:inline">{getFileType(file.name)}</span>
                               <span>•</span>
                               <span>{formatDate(file.updatedAt)}</span>
                             </div>
@@ -1048,38 +1054,45 @@ export default function FilesTab() {
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
+                    {/* Action buttons - icon only on mobile, full on desktop */}
+                    <div className="flex gap-2 flex-shrink-0 ml-8 sm:ml-0">
                       {/* Hide action buttons when renaming this file */}
                       {renamingFile?.path !== file.path && (
                         <>
                           <button
                             onClick={() => openMoveModal(file)}
-                            className="px-4 py-2 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/30 hover:border-cyan-500/50 transition-all text-sm font-medium"
+                            className="p-2 sm:px-4 sm:py-2 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/30 hover:border-cyan-500/50 transition-all text-sm font-medium min-w-[40px] min-h-[40px] flex items-center justify-center"
                             title="Move file"
                           >
-                            📦 Move
+                            <span>📦</span>
+                            <span className="hidden sm:inline ml-1">Move</span>
                           </button>
                           {isPreviewable(file.name) && (
                             <button
                               onClick={() => handlePreviewFile(file)}
                               disabled={loadingPreview}
-                              className="px-4 py-2 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-500/30 hover:border-blue-500/50 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="p-2 sm:px-4 sm:py-2 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-500/30 hover:border-blue-500/50 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed min-w-[40px] min-h-[40px] flex items-center justify-center"
                               title="Preview file"
                             >
-                              👁️ Preview
+                              <span>👁️</span>
+                              <span className="hidden sm:inline ml-1">Preview</span>
                             </button>
                           )}
                           <button
                             onClick={() => downloadFile(file.path, file.name)}
-                            className="px-4 py-2 bg-gradient-to-r from-dark-accent to-purple-600 text-white rounded-lg hover:from-dark-accentHover hover:to-purple-500 transition-all transform hover:scale-105 text-sm font-medium shadow-lg shadow-dark-accent/20"
+                            className="p-2 sm:px-4 sm:py-2 bg-gradient-to-r from-dark-accent to-purple-600 text-white rounded-lg hover:from-dark-accentHover hover:to-purple-500 transition-all text-sm font-medium shadow-lg shadow-dark-accent/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                            title="Download file"
                           >
-                            ⬇️ Download
+                            <span>⬇️</span>
+                            <span className="hidden sm:inline ml-1">Download</span>
                           </button>
                           <button
                             onClick={() => deleteFile(file.path, file.name)}
-                            className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 hover:border-red-500/50 transition-all text-sm font-medium"
+                            className="p-2 sm:px-4 sm:py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 hover:border-red-500/50 transition-all text-sm font-medium min-w-[40px] min-h-[40px] flex items-center justify-center"
+                            title="Delete file"
                           >
-                            🗑️ Delete
+                            <span>🗑️</span>
+                            <span className="hidden sm:inline ml-1">Delete</span>
                           </button>
                         </>
                       )}
