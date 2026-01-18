@@ -817,7 +817,7 @@ export default function FilesTab() {
                 disabled={bulkActionLoading}
                 className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gradient-to-r from-dark-accent to-purple-600 text-white rounded-lg hover:from-dark-accentHover hover:to-purple-500 transition-all text-sm font-medium shadow-lg shadow-dark-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px]"
               >
-                {bulkActionLoading ? '⏳' : '📦'} <span className="hidden xs:inline">Download</span> ZIP
+                {bulkActionLoading ? '⏳' : '📦'} <span className="hidden sm:inline">Download</span> ZIP
               </button>
               <button
                 onClick={handleBulkDelete}
