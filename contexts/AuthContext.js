@@ -1,11 +1,16 @@
 /**
  * Authentication Context
  * Provides auth state and functions throughout the application
+ * Includes proactive session refresh to prevent expired token issues
  */
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const AuthContext = createContext(null);
+
+// Session refresh configuration
+const SESSION_REFRESH_THRESHOLD = 5 * 60 * 1000; // 5 minutes before expiry
+const SESSION_CHECK_INTERVAL = 60 * 1000; // Check every minute
 
 /**
  * Get the browser-side Supabase auth client
@@ -40,6 +45,8 @@ export function AuthProvider({ children }) {
   const [settingsLoading, setSettingsLoading] = useState(true); // Track settings loading separately
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const refreshIntervalRef = useRef(null);
+  const isRefreshingRef = useRef(false);
 
   // Helper to get current access token
   const getAccessToken = useCallback(async () => {
@@ -48,17 +55,36 @@ export function AuthProvider({ children }) {
     return session?.access_token || null;
   }, [supabase]);
 
-  // Helper for authenticated API calls
+  // Helper to get CSRF token from cookie
+  const getCsrfToken = useCallback(() => {
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.match(/csrf_token=([^;]+)/);
+    if (!match) return null;
+    // Cookie contains token.timestamp.signature, we need just the token part
+    const combined = match[1];
+    const tokenPart = combined.split('.')[0];
+    return tokenPart || null;
+  }, []);
+
+  // Helper for authenticated API calls (includes CSRF token for state-changing requests)
   const authFetch = useCallback(async (url, options = {}) => {
     const token = await getAccessToken();
+    const method = options.method?.toUpperCase() || 'GET';
+    const isStateChanging = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
+
+    // Get CSRF token for state-changing requests
+    const csrfToken = isStateChanging ? getCsrfToken() : null;
+
     return fetch(url, {
       ...options,
+      credentials: 'include', // Include cookies for CSRF
       headers: {
         ...options.headers,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
       },
     });
-  }, [getAccessToken]);
+  }, [getAccessToken, getCsrfToken]);
 
   // Fetch user settings from API
   const fetchSettings = useCallback(async () => {
@@ -121,6 +147,77 @@ export function AuthProvider({ children }) {
       fetchSettings();
     }
   }, [user, fetchSettings]);
+
+  /**
+   * Check if session is about to expire and refresh proactively
+   * This prevents failed API requests due to expired tokens
+   */
+  const checkAndRefreshSession = useCallback(async () => {
+    if (!supabase || !session || isRefreshingRef.current) {
+      return;
+    }
+
+    try {
+      // Get session expiry time from the JWT
+      const expiresAt = session.expires_at;
+      if (!expiresAt) {
+        return;
+      }
+
+      // expiresAt is in seconds (Unix timestamp), convert to milliseconds
+      const expiresAtMs = expiresAt * 1000;
+      const now = Date.now();
+      const timeUntilExpiry = expiresAtMs - now;
+
+      // If session expires within the threshold, refresh proactively
+      if (timeUntilExpiry <= SESSION_REFRESH_THRESHOLD && timeUntilExpiry > 0) {
+        console.log(`[Auth] Session expires in ${Math.round(timeUntilExpiry / 1000)}s, refreshing proactively...`);
+
+        isRefreshingRef.current = true;
+
+        const { data, error: refreshError } = await supabase.auth.refreshSession();
+
+        if (refreshError) {
+          console.error('[Auth] Proactive session refresh failed:', refreshError.message);
+          // Don't sign out - let the autoRefreshToken handle it or next request will fail
+        } else if (data?.session) {
+          console.log('[Auth] Session refreshed successfully');
+          setSession(data.session);
+          setUser(data.session.user);
+        }
+
+        isRefreshingRef.current = false;
+      }
+    } catch (err) {
+      console.error('[Auth] Error checking session expiry:', err);
+      isRefreshingRef.current = false;
+    }
+  }, [supabase, session]);
+
+  // Set up proactive session refresh interval
+  useEffect(() => {
+    if (!supabase || !session) {
+      // Clear interval if no session
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Check immediately
+    checkAndRefreshSession();
+
+    // Set up interval for periodic checks
+    refreshIntervalRef.current = setInterval(checkAndRefreshSession, SESSION_CHECK_INTERVAL);
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+    };
+  }, [supabase, session, checkAndRefreshSession]);
 
   /**
    * Sign in with email and password

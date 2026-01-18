@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased (v1-features)
+## Unreleased
+
+### Added
+- **Mobile Responsive Design**
+  - Responsive layouts for all FilesTab controls (stack on mobile, row on desktop)
+  - Touch-friendly targets with 44px minimum height (iOS/Android guidelines)
+  - Condensed button text on mobile ("Folder" instead of "New Folder")
+  - Full-width inputs and selects on mobile screens
+  - Smaller text sizes on mobile (text-xs) scaling up on larger screens
+  - Responsive gaps and padding (tighter on mobile)
+  - Hidden labels on mobile with icon-only buttons where appropriate
+
+## Previous (authentication)
 
 ### Added
 - **User Authentication System**
