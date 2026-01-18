@@ -76,7 +76,15 @@ export function verifySignedCsrfToken(combined, secret) {
     .digest('hex');
 
   // Use timing-safe comparison to prevent timing attacks
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+  // Wrap in try-catch because timingSafeEqual throws if buffer lengths differ
+  try {
+    const signatureBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expectedSignature);
+    if (signatureBuffer.length !== expectedBuffer.length ||
+        !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) {
+      return { valid: false, error: 'Invalid CSRF token signature' };
+    }
+  } catch {
     return { valid: false, error: 'Invalid CSRF token signature' };
   }
 

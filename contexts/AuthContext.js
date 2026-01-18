@@ -55,17 +55,36 @@ export function AuthProvider({ children }) {
     return session?.access_token || null;
   }, [supabase]);
 
-  // Helper for authenticated API calls
+  // Helper to get CSRF token from cookie
+  const getCsrfToken = useCallback(() => {
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.match(/csrf_token=([^;]+)/);
+    if (!match) return null;
+    // Cookie contains token.timestamp.signature, we need just the token part
+    const combined = match[1];
+    const tokenPart = combined.split('.')[0];
+    return tokenPart || null;
+  }, []);
+
+  // Helper for authenticated API calls (includes CSRF token for state-changing requests)
   const authFetch = useCallback(async (url, options = {}) => {
     const token = await getAccessToken();
+    const method = options.method?.toUpperCase() || 'GET';
+    const isStateChanging = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
+
+    // Get CSRF token for state-changing requests
+    const csrfToken = isStateChanging ? getCsrfToken() : null;
+
     return fetch(url, {
       ...options,
+      credentials: 'include', // Include cookies for CSRF
       headers: {
         ...options.headers,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
       },
     });
-  }, [getAccessToken]);
+  }, [getAccessToken, getCsrfToken]);
 
   // Fetch user settings from API
   const fetchSettings = useCallback(async () => {

@@ -199,18 +199,18 @@ export async function uploadFile(supabase, filePath, bucketName, storagePath, ma
     // Sanitize path to handle non-ASCII characters (Thai, Chinese, etc.)
     const finalStoragePath = sanitizeStoragePath(rawStoragePath);
 
-    // Use streaming for large files to reduce memory footprint
-    // For smaller files, readFileSync is more efficient
+    // Note: Both approaches load the entire file into memory before upload.
+    // Streaming here provides incremental reading but still buffers fully
+    // for the Supabase upload API. True streaming would require TUS protocol.
     const useStreaming = fileSize > STREAMING_THRESHOLD;
 
     let fileData;
     if (useStreaming) {
-      // Create a read stream for large files
-      // This prevents loading the entire file into memory at once
+      // Use streaming read for large files (reads in chunks, then buffers)
       const readStream = fs.createReadStream(filePath);
       fileData = await streamToBuffer(readStream);
     } else {
-      // For smaller files, direct read is more efficient
+      // For smaller files, direct read is simpler
       fileData = fs.readFileSync(filePath);
     }
 

@@ -62,6 +62,23 @@ export function getTusEndpoint(supabaseUrl) {
  * @param {string} fileName - File name with extension
  * @returns {string} MIME type
  */
+/**
+ * Encode a string to base64, handling UTF-8 characters properly
+ * btoa() only accepts Latin-1 characters, so we need to encode UTF-8 first
+ * @param {string} str - String to encode
+ * @returns {string} Base64 encoded string
+ */
+function utf8ToBase64(str) {
+  // Encode string to UTF-8 bytes, then to base64
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(str);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
 function getContentType(fileName) {
   const ext = fileName.split('.').pop()?.toLowerCase() || '';
   const contentTypes = {
@@ -196,16 +213,17 @@ export function createResumableUpload(options) {
       xhr.setRequestHeader('Upload-Length', file.size.toString());
 
       // Metadata (base64 encoded key-value pairs)
+      // Use utf8ToBase64 to handle non-ASCII characters (Thai, Chinese, etc.)
       const metadata = [
-        `bucketName ${btoa(bucketName)}`,
-        `objectName ${btoa(objectPath)}`,
-        `contentType ${btoa(contentType)}`,
-        `cacheControl ${btoa('3600')}`,
+        `bucketName ${utf8ToBase64(bucketName)}`,
+        `objectName ${utf8ToBase64(objectPath)}`,
+        `contentType ${utf8ToBase64(contentType)}`,
+        `cacheControl ${utf8ToBase64('3600')}`,
       ];
 
       // Add custom metadata if provided
       if (Object.keys(customMetadata).length > 0) {
-        metadata.push(`metadata ${btoa(JSON.stringify(customMetadata))}`);
+        metadata.push(`metadata ${utf8ToBase64(JSON.stringify(customMetadata))}`);
       }
 
       xhr.setRequestHeader('Upload-Metadata', metadata.join(','));
