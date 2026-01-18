@@ -66,14 +66,35 @@ export function AuthProvider({ children }) {
     return tokenPart || null;
   }, []);
 
+  // Helper to fetch CSRF token from API when cookie is missing
+  const fetchCsrfToken = useCallback(async () => {
+    try {
+      const response = await fetch('/api/csrf', {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.success && data.token ? data.token : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   // Helper for authenticated API calls (includes CSRF token for state-changing requests)
   const authFetch = useCallback(async (url, options = {}) => {
     const token = await getAccessToken();
     const method = options.method?.toUpperCase() || 'GET';
     const isStateChanging = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
 
-    // Get CSRF token for state-changing requests
-    const csrfToken = isStateChanging ? getCsrfToken() : null;
+    // Get CSRF token for state-changing requests, fetch from API if missing
+    let csrfToken = null;
+    if (isStateChanging) {
+      csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        csrfToken = await fetchCsrfToken();
+      }
+    }
 
     return fetch(url, {
       ...options,
@@ -84,7 +105,7 @@ export function AuthProvider({ children }) {
         ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
       },
     });
-  }, [getAccessToken, getCsrfToken]);
+  }, [getAccessToken, getCsrfToken, fetchCsrfToken]);
 
   // Fetch user settings from API
   const fetchSettings = useCallback(async () => {
