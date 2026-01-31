@@ -40,28 +40,14 @@ export function sanitizeStoragePath(storagePath) {
     const extension = lastDotIndex > 0 ? part.substring(lastDotIndex) : '';
 
     // Check if name contains non-ASCII characters
-    let hasNonAscii = false;
-    let sanitized = '';
+    const hasNonAscii = /[^\x00-\x7F]/.test(name);
 
-    for (const char of name) {
-      const code = char.charCodeAt(0);
-      // Keep ASCII alphanumeric, hyphen, underscore
-      if ((code >= 48 && code <= 57) ||  // 0-9
-        (code >= 65 && code <= 90) ||  // A-Z
-        (code >= 97 && code <= 122) || // a-z
-        char === '-' || char === '_') {
-        sanitized += char;
-      } else if (char === ' ') {
-        // Replace spaces with underscores
-        sanitized += '_';
-      } else if (code > 127) {
-        // Non-ASCII character - mark and skip
-        hasNonAscii = true;
-      } else {
-        // Other ASCII special chars - replace with underscore
-        sanitized += '_';
-      }
-    }
+    // Remove non-ASCII characters
+    let sanitized = name.replace(/[^\x00-\x7F]/g, '');
+
+    // Replace spaces and other unsafe ASCII chars with underscores
+    // Safe: a-z, A-Z, 0-9, -, _
+    sanitized = sanitized.replace(/[^a-zA-Z0-9\-_]/g, '_');
 
     // Remove consecutive underscores
     sanitized = sanitized.replace(/_+/g, '_').replace(/^_|_$/g, '');
