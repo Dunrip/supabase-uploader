@@ -38,6 +38,35 @@ export default function FilesTab() {
   const [movingFile, setMovingFile] = useState(null);
   const [moveDestination, setMoveDestination] = useState('');
   const [movingLoading, setMovingLoading] = useState(false);
+
+  // Confirmation Modal state
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    type: 'danger'
+  });
+  const [confirmLoading, setConfirmLoading] = useState(false);
+
+  const openConfirm = (title, message, onConfirmAction, type = 'danger') => {
+    setConfirmConfig({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: async () => {
+        setConfirmLoading(true);
+        try {
+          await onConfirmAction();
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        } finally {
+          setConfirmLoading(false);
+        }
+      },
+      type
+    });
+  };
+
   const fileInputRef = useRef(null);
   const renameInputRef = useRef(null);
   const newFolderInputRef = useRef(null);
@@ -169,35 +198,37 @@ export default function FilesTab() {
   };
 
   // Delete folder handler
-  const deleteFolder = async (folderPath, folderName) => {
-    if (!confirm(`Are you sure you want to delete the folder "${folderName}" and all its contents?`)) {
-      return;
-    }
-
-    try {
-      const response = await authFetch(
-        `/api/folders?path=${encodeURIComponent(folderPath)}&bucket=${currentBucket}`,
-        { method: 'DELETE' }
-      );
-      const data = await handleApiResponse(response);
-      if (data.success) {
-        setNotification({
-          message: `Folder "${folderName}" deleted (${data.deletedCount} items)`,
-          type: 'success',
-        });
-        loadFiles();
-      } else {
-        setNotification({
-          message: data.error || 'Failed to delete folder',
-          type: 'error',
-        });
+  const deleteFolder = (folderPath, folderName) => {
+    openConfirm(
+      'Delete Folder',
+      `Are you sure you want to delete the folder "${folderName}" and all its contents? This action cannot be undone.`,
+      async () => {
+        try {
+          const response = await authFetch(
+            `/api/folders?path=${encodeURIComponent(folderPath)}&bucket=${currentBucket}`,
+            { method: 'DELETE' }
+          );
+          const data = await handleApiResponse(response);
+          if (data.success) {
+            setNotification({
+              message: `Folder "${folderName}" deleted (${data.deletedCount} items)`,
+              type: 'success',
+            });
+            loadFiles();
+          } else {
+            setNotification({
+              message: data.error || 'Failed to delete folder',
+              type: 'error',
+            });
+          }
+        } catch (error) {
+          setNotification({
+            message: error.message || 'Failed to delete folder',
+            type: 'error',
+          });
+        }
       }
-    } catch (error) {
-      setNotification({
-        message: error.message || 'Failed to delete folder',
-        type: 'error',
-      });
-    }
+    );
   };
 
   // Move file handler
@@ -257,24 +288,32 @@ export default function FilesTab() {
     }
   };
 
-  const deleteFile = async (filePath, fileName) => {
-    if (!confirm(`Are you sure you want to delete "${fileName}"?`)) {
-      return;
-    }
-
-    try {
-      const response = await authFetch(`/api/files?path=${encodeURIComponent(filePath)}&bucket=${currentBucket}`, {
-        method: 'DELETE',
-      });
-      const data = await handleApiResponse(response);
-      if (data.success) {
-        loadFiles();
-      } else {
-        alert('Delete failed: ' + data.error);
+  const deleteFile = (filePath, fileName) => {
+    openConfirm(
+      'Delete File',
+      `Are you sure you want to delete "${fileName}"? This action cannot be undone.`,
+      async () => {
+        try {
+          const response = await authFetch(`/api/files?path=${encodeURIComponent(filePath)}&bucket=${currentBucket}`, {
+            method: 'DELETE',
+          });
+          const data = await handleApiResponse(response);
+          if (data.success) {
+            loadFiles();
+          } else {
+            setNotification({
+              message: 'Delete failed: ' + data.error,
+              type: 'error'
+            });
+          }
+        } catch (error) {
+          setNotification({
+            message: 'Delete failed: ' + error.message,
+            type: 'error'
+          });
+        }
       }
-    } catch (error) {
-      alert('Delete failed: ' + error.message);
-    }
+    );
   };
 
   const handlePreviewFile = async (file) => {
@@ -367,49 +406,52 @@ export default function FilesTab() {
   };
 
   // Bulk delete handler
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedFiles.size === 0) return;
 
-    const confirmMessage = `Are you sure you want to delete ${selectedFiles.size} file${selectedFiles.size > 1 ? 's' : ''}?`;
-    if (!confirm(confirmMessage)) return;
+    openConfirm(
+      'Delete Multiple Files',
+      `Are you sure you want to delete ${selectedFiles.size} file${selectedFiles.size > 1 ? 's' : ''}? This action cannot be undone.`,
+      async () => {
+        setBulkActionLoading(true);
+        let successCount = 0;
+        let errorCount = 0;
 
-    setBulkActionLoading(true);
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const filePath of selectedFiles) {
-      try {
-        const response = await authFetch(
-          `/api/files?path=${encodeURIComponent(filePath)}&bucket=${currentBucket}`,
-          { method: 'DELETE' }
-        );
-        const data = await handleApiResponse(response);
-        if (data.success) {
-          successCount++;
-        } else {
-          errorCount++;
+        for (const filePath of selectedFiles) {
+          try {
+            const response = await authFetch(
+              `/api/files?path=${encodeURIComponent(filePath)}&bucket=${currentBucket}`,
+              { method: 'DELETE' }
+            );
+            const data = await handleApiResponse(response);
+            if (data.success) {
+              successCount++;
+            } else {
+              errorCount++;
+            }
+          } catch (error) {
+            errorCount++;
+          }
         }
-      } catch (error) {
-        errorCount++;
+
+        setBulkActionLoading(false);
+        setSelectedFiles(new Set());
+
+        if (errorCount === 0) {
+          setNotification({
+            message: `Successfully deleted ${successCount} file${successCount > 1 ? 's' : ''}`,
+            type: 'success',
+          });
+        } else {
+          setNotification({
+            message: `Deleted ${successCount} file${successCount > 1 ? 's' : ''}, ${errorCount} failed`,
+            type: 'error',
+          });
+        }
+
+        loadFiles();
       }
-    }
-
-    setBulkActionLoading(false);
-    setSelectedFiles(new Set());
-
-    if (errorCount === 0) {
-      setNotification({
-        message: `Successfully deleted ${successCount} file${successCount > 1 ? 's' : ''}`,
-        type: 'success',
-      });
-    } else {
-      setNotification({
-        message: `Deleted ${successCount} file${successCount > 1 ? 's' : ''}, ${errorCount} failed`,
-        type: 'error',
-      });
-    }
-
-    loadFiles();
+    );
   };
 
   // Bulk download handler (downloads as zip)
@@ -1104,6 +1146,17 @@ export default function FilesTab() {
           )}
         </div>
 
+        {/* Confirm Modal */}
+        <ConfirmModal
+          isOpen={confirmConfig.isOpen}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          type={confirmConfig.type}
+          isLoading={confirmLoading}
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        />
+
         {/* Preview Modal */}
         {previewFile && previewUrl && (
           <FilePreview
@@ -1119,7 +1172,7 @@ export default function FilesTab() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-dark-surface border border-dark-border rounded-xl p-6 w-full max-w-md animate-slide-up">
               <h3 className="text-lg font-medium text-dark-text mb-4">
-                Move "{movingFile.name}"
+                Move &quot;{movingFile.name}&quot;
               </h3>
 
               <div className="space-y-4">
