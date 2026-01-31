@@ -1119,7 +1119,7 @@ export default function FilesTab() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-dark-surface border border-dark-border rounded-xl p-6 w-full max-w-md animate-slide-up">
               <h3 className="text-lg font-medium text-dark-text mb-4">
-                Move "{movingFile.name}"
+                Move &quot;{movingFile.name}&quot;
               </h3>
 
               <div className="space-y-4">

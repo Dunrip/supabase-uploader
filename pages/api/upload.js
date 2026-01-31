@@ -55,7 +55,7 @@ async function handler(req, res) {
   let uploadedFile = null;
 
   try {
-    const uploadDir = getTempDir();
+    const uploadDir = await getTempDir();
 
     const form = new IncomingForm({
       uploadDir,
@@ -77,14 +77,14 @@ async function handler(req, res) {
     // Validate filename
     const filenameValidation = validateFilename(file.originalFilename);
     if (!filenameValidation.valid) {
-      cleanupTempFile(file.filepath);
+      await cleanupTempFile(file.filepath);
       return sendError(res, filenameValidation.error, 400);
     }
 
     // Validate file type (magic bytes check)
     const fileTypeValidation = await validateFileType(file.filepath, file.originalFilename);
     if (!fileTypeValidation.valid) {
-      cleanupTempFile(file.filepath);
+      await cleanupTempFile(file.filepath);
       return sendError(res, fileTypeValidation.error, 400);
     }
 
@@ -92,7 +92,7 @@ async function handler(req, res) {
     const bucketName = fields.bucket?.[0] || settings.default_bucket || 'files';
     const bucketValidation = validateBucketName(bucketName);
     if (!bucketValidation.valid) {
-      cleanupTempFile(file.filepath);
+      await cleanupTempFile(file.filepath);
       return sendError(res, bucketValidation.error, 400);
     }
 
@@ -101,7 +101,7 @@ async function handler(req, res) {
     if (fields.path?.[0]) {
       const pathValidation = validateStoragePath(fields.path[0]);
       if (!pathValidation.valid) {
-        cleanupTempFile(file.filepath);
+        await cleanupTempFile(file.filepath);
         return sendError(res, pathValidation.error, 400);
       }
       storagePath = pathValidation.sanitized;
@@ -130,7 +130,7 @@ async function handler(req, res) {
       'Upload timeout - file may be too large or connection is slow'
     );
 
-    cleanupTempFile(file.filepath);
+    await cleanupTempFile(file.filepath);
 
     if (!result?.success) {
       throw new Error(result?.error || 'Upload failed');
@@ -141,7 +141,7 @@ async function handler(req, res) {
     console.error('Upload failed:', error);
 
     if (uploadedFile?.filepath) {
-      cleanupTempFile(uploadedFile.filepath);
+      await cleanupTempFile(uploadedFile.filepath);
     }
 
     sendError(res, error.message || 'Upload failed. Please check server logs.', 500);
