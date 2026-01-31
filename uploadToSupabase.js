@@ -490,6 +490,36 @@ async function downloadFile(storagePath, bucketName = DEFAULT_BUCKET, localPath 
 }
 
 /**
+ * Helper to run promises with a concurrency limit
+ * @param {Array} items - Items to process
+ * @param {number} limit - Concurrency limit
+ * @param {Function} fn - Async function to run for each item
+ * @returns {Promise<Array>} Results
+ */
+async function limitConcurrency(items, limit, fn) {
+  const results = [];
+  const executing = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    // Create a promise that runs the function and returns its result
+    const p = Promise.resolve().then(() => fn(item, i));
+
+    results.push(p);
+
+    if (limit <= items.length) {
+      const e = p.then(() => executing.splice(executing.indexOf(e), 1));
+      executing.push(e);
+      if (executing.length >= limit) {
+        await Promise.race(executing);
+      }
+    }
+  }
+
+  return Promise.all(results);
+}
+
+/**
  * Download multiple files from Supabase Storage
  * @param {Array<string>} storagePaths - Array of storage paths
  * @param {string} bucketName - Bucket name
@@ -497,7 +527,6 @@ async function downloadFile(storagePath, bucketName = DEFAULT_BUCKET, localPath 
  * @returns {Promise<Array>} Array of download results
  */
 async function downloadMultipleFiles(storagePaths, bucketName = DEFAULT_BUCKET, localBasePath = '') {
-  const results = [];
   const totalFiles = storagePaths.length;
   
   // Create batch progress bar
@@ -510,18 +539,17 @@ async function downloadMultipleFiles(storagePaths, bucketName = DEFAULT_BUCKET, 
   
   batchProgressBar.start(totalFiles, 0);
 
+  let completedCount = 0;
   let successCount = 0;
   let failCount = 0;
 
-  for (let i = 0; i < storagePaths.length; i++) {
-    const storagePath = storagePaths[i];
+  const downloadTask = async (storagePath, index) => {
     const fileName = path.basename(storagePath);
     const localPath = localBasePath 
       ? path.join(localBasePath, fileName)
       : fileName;
 
     const result = await downloadFile(storagePath, bucketName, localPath);
-    results.push({ storagePath, ...result });
     
     if (result.success) {
       successCount++;
@@ -529,13 +557,14 @@ async function downloadMultipleFiles(storagePaths, bucketName = DEFAULT_BUCKET, 
       failCount++;
     }
     
-    batchProgressBar.update(i + 1);
+    completedCount++;
+    batchProgressBar.update(completedCount);
     
-    // Small delay between downloads
-    if (i < storagePaths.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-  }
+    return { storagePath, ...result };
+  };
+
+  // Run with concurrency limit of 5
+  const results = await limitConcurrency(storagePaths, 5, downloadTask);
 
   batchProgressBar.stop();
   
