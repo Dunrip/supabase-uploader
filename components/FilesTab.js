@@ -374,42 +374,40 @@ export default function FilesTab() {
     if (!confirm(confirmMessage)) return;
 
     setBulkActionLoading(true);
-    let successCount = 0;
-    let errorCount = 0;
 
-    for (const filePath of selectedFiles) {
-      try {
-        const response = await authFetch(
-          `/api/files?path=${encodeURIComponent(filePath)}&bucket=${currentBucket}`,
-          { method: 'DELETE' }
-        );
-        const data = await handleApiResponse(response);
-        if (data.success) {
-          successCount++;
-        } else {
-          errorCount++;
-        }
-      } catch (error) {
-        errorCount++;
-      }
-    }
-
-    setBulkActionLoading(false);
-    setSelectedFiles(new Set());
-
-    if (errorCount === 0) {
-      setNotification({
-        message: `Successfully deleted ${successCount} file${successCount > 1 ? 's' : ''}`,
-        type: 'success',
+    try {
+      const response = await authFetch('/api/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paths: Array.from(selectedFiles),
+          bucket: currentBucket,
+        }),
       });
-    } else {
+
+      const data = await handleApiResponse(response);
+
+      if (data.success) {
+        setNotification({
+          message: `Successfully deleted ${data.count} file${data.count !== 1 ? 's' : ''}`,
+          type: 'success',
+        });
+        setSelectedFiles(new Set());
+      } else {
+        setNotification({
+          message: data.error || 'Failed to delete files',
+          type: 'error',
+        });
+      }
+    } catch (error) {
       setNotification({
-        message: `Deleted ${successCount} file${successCount > 1 ? 's' : ''}, ${errorCount} failed`,
+        message: error.message || 'Failed to delete files',
         type: 'error',
       });
+    } finally {
+      setBulkActionLoading(false);
+      loadFiles();
     }
-
-    loadFiles();
   };
 
   // Bulk download handler (downloads as zip)
@@ -1119,7 +1117,7 @@ export default function FilesTab() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-dark-surface border border-dark-border rounded-xl p-6 w-full max-w-md animate-slide-up">
               <h3 className="text-lg font-medium text-dark-text mb-4">
-                Move "{movingFile.name}"
+                Move &quot;{movingFile.name}&quot;
               </h3>
 
               <div className="space-y-4">
