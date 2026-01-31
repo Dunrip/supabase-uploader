@@ -263,6 +263,31 @@ async function uploadFile(filePath, bucketName = DEFAULT_BUCKET, storagePath = n
 }
 
 /**
+ * Run promises concurrently with a limit
+ * @param {Array} items - Items to process
+ * @param {number} concurrency - Max concurrent operations
+ * @param {Function} fn - Async function to run on each item
+ * @returns {Promise<Array>} Results
+ */
+async function mapConcurrent(items, concurrency, fn) {
+  const results = [];
+  const iterator = items.entries();
+
+  const worker = async () => {
+    for (const [index, item] of iterator) {
+      results[index] = await fn(item, index);
+    }
+  };
+
+  const workers = Array(Math.min(items.length, concurrency))
+    .fill(null)
+    .map(() => worker());
+
+  await Promise.all(workers);
+  return results;
+}
+
+/**
  * Upload multiple files to Supabase Storage with batch progress
  * @param {Array<string>} filePaths - Array of local file paths
  * @param {string} bucketName - Supabase Storage bucket name
@@ -270,7 +295,6 @@ async function uploadFile(filePath, bucketName = DEFAULT_BUCKET, storagePath = n
  * @returns {Promise<Array>} Array of upload results
  */
 async function uploadMultipleFiles(filePaths, bucketName = DEFAULT_BUCKET, baseStoragePath = '') {
-  const results = [];
   const totalFiles = filePaths.length;
   
   // Create batch progress bar
@@ -285,16 +309,16 @@ async function uploadMultipleFiles(filePaths, bucketName = DEFAULT_BUCKET, baseS
 
   let successCount = 0;
   let failCount = 0;
+  let processedCount = 0;
 
-  for (let i = 0; i < filePaths.length; i++) {
-    const filePath = filePaths[i];
+  // Use mapConcurrent with limit 5
+  const results = await mapConcurrent(filePaths, 5, async (filePath) => {
     const fileName = path.basename(filePath);
     const storagePath = baseStoragePath 
       ? `${baseStoragePath}/${fileName}`.replace(/\/+/g, '/')
       : fileName;
 
     const result = await uploadFile(filePath, bucketName, storagePath, false); // Don't show individual progress bars
-    results.push({ filePath, ...result });
     
     if (result.success) {
       successCount++;
@@ -302,13 +326,11 @@ async function uploadMultipleFiles(filePaths, bucketName = DEFAULT_BUCKET, baseS
       failCount++;
     }
     
-    batchProgressBar.update(i + 1);
-    
-    // Small delay between uploads to avoid rate limiting
-    if (i < filePaths.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-  }
+    processedCount++;
+    batchProgressBar.update(processedCount);
+
+    return { filePath, ...result };
+  });
 
   batchProgressBar.stop();
   
