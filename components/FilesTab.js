@@ -418,42 +418,40 @@ export default function FilesTab() {
       `Are you sure you want to delete ${selectedFiles.size} file${selectedFiles.size > 1 ? 's' : ''}? This action cannot be undone.`,
       async () => {
         setBulkActionLoading(true);
-        let successCount = 0;
-        let errorCount = 0;
 
-        for (const filePath of selectedFiles) {
-          try {
-            const response = await authFetch(
-              `/api/files?path=${encodeURIComponent(filePath)}&bucket=${currentBucket}`,
-              { method: 'DELETE' }
-            );
-            const data = await handleApiResponse(response);
-            if (data.success) {
-              successCount++;
-            } else {
-              errorCount++;
-            }
-          } catch (error) {
-            errorCount++;
-          }
-        }
-
-        setBulkActionLoading(false);
-        setSelectedFiles(new Set());
-
-        if (errorCount === 0) {
-          setNotification({
-            message: `Successfully deleted ${successCount} file${successCount > 1 ? 's' : ''}`,
-            type: 'success',
+        try {
+          const response = await authFetch('/api/bulk-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              paths: Array.from(selectedFiles),
+              bucket: currentBucket,
+            }),
           });
-        } else {
+
+          const data = await handleApiResponse(response);
+
+          if (data.success) {
+            setNotification({
+              message: `Successfully deleted ${data.count} file${data.count !== 1 ? 's' : ''}`,
+              type: 'success',
+            });
+            setSelectedFiles(new Set());
+          } else {
+            setNotification({
+              message: data.error || 'Failed to delete files',
+              type: 'error',
+            });
+          }
+        } catch (error) {
           setNotification({
-            message: `Deleted ${successCount} file${successCount > 1 ? 's' : ''}, ${errorCount} failed`,
+            message: error.message || 'Failed to delete files',
             type: 'error',
           });
+        } finally {
+          setBulkActionLoading(false);
+          loadFiles();
         }
-
-        loadFiles();
       }
     );
   };
