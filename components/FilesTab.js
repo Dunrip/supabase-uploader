@@ -44,27 +44,31 @@ export default function FilesTab() {
     isOpen: false,
     title: '',
     message: '',
-    onConfirm: null,
     type: 'danger'
   });
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const confirmActionRef = useRef(null);
 
   const openConfirm = (title, message, onConfirmAction, type = 'danger') => {
+    confirmActionRef.current = onConfirmAction;
     setConfirmConfig({
       isOpen: true,
       title,
       message,
-      onConfirm: async () => {
-        setConfirmLoading(true);
-        try {
-          await onConfirmAction();
-          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
-        } finally {
-          setConfirmLoading(false);
-        }
-      },
       type
     });
+  };
+
+  const handleModalConfirm = async () => {
+    if (!confirmActionRef.current) return;
+
+    setConfirmLoading(true);
+    try {
+      await confirmActionRef.current();
+      setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+    } finally {
+      setConfirmLoading(false);
+    }
   };
 
   const fileInputRef = useRef(null);
@@ -1153,7 +1157,7 @@ export default function FilesTab() {
           message={confirmConfig.message}
           type={confirmConfig.type}
           isLoading={confirmLoading}
-          onConfirm={confirmConfig.onConfirm}
+          onConfirm={handleModalConfirm}
           onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
         />
 
