@@ -67,47 +67,18 @@ async function handler(req, res) {
       return sendError(res, 'A file with this name already exists at the destination', 409);
     }
 
-    // Supabase doesn't have a native move operation
-    // We need to: 1) Download, 2) Upload to new location, 3) Delete old file
-
-    // Step 1: Download the original file
-    const { data: fileData, error: downloadError } = await supabase.storage
+    // Use Supabase native move operation
+    const { error: moveError } = await supabase.storage
       .from(bucketName)
-      .download(sanitizedSourcePath);
+      .move(sanitizedSourcePath, destinationPath);
 
-    if (downloadError) {
-      console.error('Download error during move:', downloadError);
-      return sendError(res, 'Failed to access source file', 500);
-    }
-
-    if (!fileData) {
-      return sendError(res, 'Source file not found', 404);
-    }
-
-    // Step 2: Upload to new location
-    const buffer = Buffer.from(await fileData.arrayBuffer());
-    const { error: uploadError } = await supabase.storage
-      .from(bucketName)
-      .upload(destinationPath, buffer, {
-        contentType: fileData.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error('Upload error during move:', uploadError);
-      return sendError(res, uploadError.message || 'Failed to move file', 500);
-    }
-
-    // Step 3: Delete the old file
-    const { error: deleteError } = await supabase.storage
-      .from(bucketName)
-      .remove([sanitizedSourcePath]);
-
-    if (deleteError) {
-      // Try to clean up the new file since deletion failed
-      console.error('Delete error during move:', deleteError);
-      await supabase.storage.from(bucketName).remove([destinationPath]);
-      return sendError(res, 'Failed to complete move operation', 500);
+    if (moveError) {
+      console.error('Move error:', moveError);
+      // Handle missing file error
+      if (moveError.statusCode === '404' || moveError.message?.includes('not found')) {
+        return sendError(res, 'Source file not found', 404);
+      }
+      return sendError(res, moveError.message || 'Failed to move file', 500);
     }
 
     return sendSuccess(res, {
