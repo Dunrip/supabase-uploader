@@ -21,6 +21,15 @@ function extractAccessToken(req) {
     return authHeader.substring(7);
   }
 
+  // Temporary compatibility for browser media preview requests:
+  // <img>/<video>/<iframe> cannot attach Authorization headers, and this app
+  // currently serves preview URLs with ?token=. Restrict query-token fallback
+  // to /api/preview only to reduce exposure surface.
+  const requestUrl = req.url || '';
+  if (requestUrl.startsWith('/api/preview') && req.query?.token) {
+    return req.query.token;
+  }
+
   // Check cookies
   const cookies = req.cookies || {};
 
