@@ -470,3 +470,35 @@ export function getPublicUrl(supabase, storagePath, bucketName) {
 
   return data.publicUrl;
 }
+
+/**
+ * Check if a file exists in the bucket
+ * @param {SupabaseClient} supabase - Supabase client instance
+ * @param {string} bucketName - Bucket name
+ * @param {string} storagePath - Path in bucket
+ * @returns {Promise<boolean>} True if file exists
+ */
+export async function checkFileExists(supabase, bucketName, storagePath) {
+  // Handle storage paths (which use /) independent of OS
+  const lastSlashIndex = storagePath.lastIndexOf('/');
+  const folderPath = lastSlashIndex > -1 ? storagePath.substring(0, lastSlashIndex) : '';
+  const fileName = lastSlashIndex > -1 ? storagePath.substring(lastSlashIndex + 1) : storagePath;
+
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .list(folderPath, {
+        search: fileName,
+        limit: 1 // We only need to find one match
+      });
+
+    if (error) throw error;
+
+    // Exact match check
+    return data && data.some(f => f.name === fileName);
+  } catch (error) {
+    console.error('Error checking file existence:', error.message);
+    // If we can't check, assume it doesn't exist to allow upload attempt
+    return false;
+  }
+}
