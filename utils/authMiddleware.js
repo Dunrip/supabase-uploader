@@ -21,12 +21,6 @@ function extractAccessToken(req) {
     return authHeader.substring(7);
   }
 
-  // Check query parameter (for browser-initiated requests like image loading)
-  // This is used when the browser loads images/videos directly without fetch
-  if (req.query?.token) {
-    return req.query.token;
-  }
-
   // Check cookies
   const cookies = req.cookies || {};
 
@@ -114,9 +108,15 @@ function validateCsrf(req, res, skipCsrf = false) {
 
     return true;
   } catch (error) {
-    // If CSRF_SECRET/ENCRYPTION_KEY is not configured, log warning but allow request
-    // This provides backward compatibility during migration
-    console.warn('[Auth] CSRF validation skipped:', error.message);
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction) {
+      console.error('[Auth] CSRF validation misconfigured:', error.message);
+      sendError(res, 'CSRF protection misconfigured on server', 500);
+      return false;
+    }
+
+    // Development fallback to avoid blocking local setup.
+    console.warn('[Auth] CSRF validation skipped in development:', error.message);
     return true;
   }
 }
