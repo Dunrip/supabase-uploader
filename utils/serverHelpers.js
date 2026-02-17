@@ -60,13 +60,11 @@ export function escapeJsString(text) {
 
 /**
  * Get or create temp directory
- * @returns {string} Path to temp directory
+ * @returns {Promise<string>} Path to temp directory
  */
-export function getTempDir() {
+export async function getTempDir() {
   const uploadDir = path.join(process.cwd(), 'temp');
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-  }
+  await fs.promises.mkdir(uploadDir, { recursive: true });
   return uploadDir;
 }
 
@@ -83,49 +81,20 @@ export function getDefaultBucket() {
  * @param {string} filePath - Path to file to delete
  * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
  * @param {number} retryDelay - Delay between retries in ms (default: 100)
- */
-export function cleanupTempFile(filePath, maxRetries = 3, retryDelay = 100) {
-  if (!filePath) return;
-
-  const attemptCleanup = (retriesLeft) => {
-    try {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    } catch (err) {
-      if (retriesLeft > 0) {
-        // Retry after delay
-        setTimeout(() => {
-          attemptCleanup(retriesLeft - 1);
-        }, retryDelay);
-      } else {
-        // Log failure after all retries exhausted
-        console.warn(`Failed to delete temp file after ${maxRetries} attempts:`, filePath, err.message);
-      }
-    }
-  };
-
-  attemptCleanup(maxRetries);
-}
-
-/**
- * Async version of cleanupTempFile with retry logic
- * @param {string} filePath - Path to file to delete
- * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
- * @param {number} retryDelay - Delay between retries in ms (default: 100)
  * @returns {Promise<boolean>} True if file was deleted, false otherwise
  */
-export async function cleanupTempFileAsync(filePath, maxRetries = 3, retryDelay = 100) {
+export async function cleanupTempFile(filePath, maxRetries = 3, retryDelay = 100) {
   if (!filePath) return false;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      if (fs.existsSync(filePath)) {
-        await fs.promises.unlink(filePath);
+      await fs.promises.unlink(filePath);
+      return true;
+    } catch (err) {
+      // If file doesn't exist, we consider it cleaned up
+      if (err.code === 'ENOENT') {
         return true;
       }
-      return true; // File doesn't exist, consider it cleaned up
-    } catch (err) {
       if (attempt < maxRetries) {
         // Wait before retrying
         await new Promise(resolve => setTimeout(resolve, retryDelay));
