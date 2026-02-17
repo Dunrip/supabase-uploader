@@ -1,4 +1,3 @@
-import path from 'path';
 import { validateMethod, validateQueryParams, sendError } from '../../utils/apiHelpers';
 import { validateStoragePath, validateBucketName } from '../../utils/security';
 import { withAuth } from '../../utils/authMiddleware.js';
@@ -31,82 +30,29 @@ async function handler(req, res) {
   try {
     console.log('Preview request for path:', storagePath, 'in bucket:', bucketName);
 
-    // Try to get the file from storage
-    let { data, error } = await supabase.storage
+    // Create a signed URL for the file
+    // This offloads bandwidth to Supabase and is faster than proxying the file
+    // We set expiry to 3600s (1 hour) to match the previous Cache-Control max-age
+    const { data, error } = await supabase.storage
       .from(bucketName)
-      .download(storagePath);
+      .createSignedUrl(storagePath, 3600);
 
-    // If file not found and path might be double-encoded, try decoding
-    if (error && error.message?.includes('not found')) {
-      const decodedPath = decodeURIComponent(storagePath);
-      if (decodedPath !== storagePath) {
-        console.log('Trying decoded path:', decodedPath);
-        const retryResult = await supabase.storage
-          .from(bucketName)
-          .download(decodedPath);
-        data = retryResult.data;
-        error = retryResult.error;
-      }
-    }
+    // Note: createSignedUrl does not verify file existence efficiently.
+    // The previous retry logic for double-encoded paths is removed as we cannot
+    // easily detect "not found" without an extra round-trip which defeats the performance optimization.
+    // If the path is incorrect, the signed URL will result in a 404 from Supabase.
 
     if (error) {
-      console.error('Preview download error:', error);
-
-      // Provide more specific error messages
-      if (error.message && error.message.includes('Bucket not found')) {
-        return sendError(res, `Bucket "${bucketName}" not found. Please check the bucket name.`, 404);
-      }
-
-      if (error.message && (error.message.includes('Object not found') || error.message.includes('not found'))) {
-        return sendError(res, `File "${storagePath}" not found in bucket "${bucketName}"`, 404);
-      }
-
-      return sendError(res, error.message || 'File not found', 404);
+      console.error('Preview signed URL error:', error);
+      return sendError(res, error.message || 'Failed to generate preview URL', 500);
     }
 
-    if (!data) {
-      return sendError(res, 'File not found', 404);
+    if (!data || !data.signedUrl) {
+      return sendError(res, 'Failed to generate preview URL', 500);
     }
 
-    // Get file extension to determine content type
-    const ext = path.extname(storagePath).toLowerCase();
-    const contentTypeMap = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif',
-      '.webp': 'image/webp',
-      '.svg': 'image/svg+xml',
-      '.bmp': 'image/bmp',
-      '.mp4': 'video/mp4',
-      '.avi': 'video/x-msvideo',
-      '.mov': 'video/quicktime',
-      '.webm': 'video/webm',
-      '.mp3': 'audio/mpeg',
-      '.wav': 'audio/wav',
-      '.ogg': 'audio/ogg',
-      '.pdf': 'application/pdf',
-    };
-
-    const contentType = contentTypeMap[ext] || 'application/octet-stream';
-
-    // Convert blob to buffer
-    const arrayBuffer = await data.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Properly escape filename for Content-Disposition header
-    // RFC 5987: Use both filename and filename* for maximum compatibility
-    const fileName = path.basename(storagePath);
-    const safeFileName = fileName.replace(/"/g, '\\"').replace(/\n/g, '');
-    const encodedFileName = encodeURIComponent(fileName);
-
-    // Set headers for inline display
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Length', buffer.length);
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.setHeader('Content-Disposition', `inline; filename="${safeFileName}"; filename*=UTF-8''${encodedFileName}`);
-
-    res.send(buffer);
+    // Redirect to the signed URL
+    res.redirect(data.signedUrl);
   } catch (error) {
     console.error('Preview error:', error);
     sendError(res, error.message || 'Failed to preview file', 500);
