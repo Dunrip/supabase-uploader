@@ -1,9 +1,11 @@
 import { validateMethod, sendSuccess, sendError } from '../../utils/apiHelpers';
 import { validateStoragePath, validateBucketName, validateFilename } from '../../utils/security';
 import { withAuth } from '../../utils/authMiddleware.js';
+import { enforceRole } from '../../utils/rbac.js';
 import { createStorageClientWithErrorHandling } from '../../utils/storageClientFactory.js';
 
 async function handler(req, res) {
+  if (!enforceRole(req, res, 'operator')) return;
   // Get user's storage client
   const storageResult = await createStorageClientWithErrorHandling(req, res);
   if (!storageResult) return;
@@ -11,6 +13,7 @@ async function handler(req, res) {
   const { client: supabase, settings } = storageResult;
 
   if (req.method === 'POST') {
+    if (!enforceRole(req, res, 'operator')) return;
     // Create folder
     const { folderName, parentPath, bucket } = req.body;
 
@@ -77,6 +80,7 @@ async function handler(req, res) {
       return sendError(res, error.message || 'Failed to create folder', 500);
     }
   } else if (req.method === 'DELETE') {
+    if (!enforceRole(req, res, 'operator')) return;
     // Delete folder recursively
     const { path, bucket } = req.query;
 

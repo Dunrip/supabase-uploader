@@ -1,11 +1,12 @@
 import path from 'path';
 import fs from 'fs';
 import { validateMethod, sendSuccess, sendError } from '../../utils/apiHelpers';
+import { withAuth } from '../../utils/authMiddleware.js';
 
 const LOG_FILE = process.env.LOG_FILE || 'supabase-uploader.log';
 const MAX_LOG_LINES = 50;
 
-export default function handler(req, res) {
+function handler(req, res) {
   if (!validateMethod(req, res, 'GET')) return;
 
   try {
@@ -31,3 +32,5 @@ export default function handler(req, res) {
     sendError(res, error.message || 'Failed to read logs', 500);
   }
 }
+
+export default withAuth(handler, { rolesAllowed: 'admin' });

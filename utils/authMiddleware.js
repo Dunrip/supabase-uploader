@@ -6,6 +6,8 @@
 import { getAuthClientServer } from './authSupabaseClient.js';
 import { sendError } from './apiHelpers.js';
 import { validateCsrfRequest, getCsrfSecret, CSRF_CONFIG } from './csrf.js';
+import { getUserRole, hasRole } from './rbac.js';
+import { enforceRequestQuota } from './quota.js';
 
 /**
  * Extract access token from request
@@ -155,7 +157,7 @@ function validateCsrf(req, res, skipCsrf = false) {
  * export default withAuth(handler, { skipCsrf: true });
  */
 export function withAuth(handler, options = {}) {
-  const { optional = false, skipCsrf = false } = options;
+  const { optional = false, skipCsrf = false, rolesAllowed } = options;
 
   return async (req, res) => {
     try {
@@ -169,6 +171,18 @@ export function withAuth(handler, options = {}) {
       if (session) {
         req.user = session.user;
         req.accessToken = session.accessToken;
+        req.userRole = getUserRole(session.user);
+
+        if (!enforceRequestQuota(req, res)) {
+          return;
+        }
+
+        if (rolesAllowed) {
+          const allowed = Array.isArray(rolesAllowed) ? rolesAllowed : [rolesAllowed];
+          if (!allowed.some(role => hasRole(role, req.userRole))) {
+            return sendError(res, 'Insufficient role for this endpoint', 403, { currentRole: req.userRole, allowedRoles: allowed });
+          }
+        }
       }
 
       // Validate CSRF for state-changing operations

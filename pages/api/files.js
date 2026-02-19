@@ -4,8 +4,10 @@ import { validateMethod, validateQueryParams, sendSuccess, sendError } from '../
 import { validateStoragePath, validateBucketName } from '../../utils/security';
 import { withAuth } from '../../utils/authMiddleware.js';
 import { createStorageClientWithErrorHandling } from '../../utils/storageClientFactory.js';
+import { enforceRole } from '../../utils/rbac.js';
 
 async function handler(req, res) {
+  if (!enforceRole(req, res, 'operator')) return;
   // Get user's storage client
   const storageResult = await createStorageClientWithErrorHandling(req, res);
   if (!storageResult) return; // Error already sent
@@ -76,6 +78,7 @@ async function handler(req, res) {
     }
   } else if (req.method === 'DELETE') {
     try {
+      if (!enforceRole(req, res, 'operator')) return;
       if (!validateQueryParams(req, res, ['path'])) return;
 
       // Validate storage path (prevent path traversal)
