@@ -3,19 +3,34 @@ import path from 'path';
 import crypto from 'crypto';
 import { getTempDir } from './serverHelpers.js';
 import { uploadFile } from './storageOperations.js';
+import { validateFileType } from './security.js';
 
 const DEFAULT_EXPIRY_SECONDS = 60 * 60; // 1 hour
 const MAX_EXPIRY_SECONDS = 24 * 60 * 60; // 24 hours
+export const MAX_APPEND_CHUNK_BYTES = Number(process.env.RESUMABLE_APPEND_MAX_BYTES || (6 * 1024 * 1024));
 
 export class ResumableUploadManager {
   constructor() {
     this.sessions = new Map();
+    this.sessionLocks = new Map();
   }
 
   async init() {
     const tempDir = await getTempDir();
     this.baseDir = path.join(tempDir, 'resumable-sessions');
     await fs.promises.mkdir(this.baseDir, { recursive: true });
+  }
+
+  async withSessionLock(sessionId, fn) {
+    const prev = this.sessionLocks.get(sessionId) || Promise.resolve();
+    const next = prev.then(fn);
+    const queued = next.catch(() => {});
+    this.sessionLocks.set(sessionId, queued.finally(() => {
+      if (this.sessionLocks.get(sessionId) === queued) {
+        this.sessionLocks.delete(sessionId);
+      }
+    }));
+    return next;
   }
 
   async cleanupExpiredSessions() {
@@ -90,109 +105,123 @@ export class ResumableUploadManager {
       throw new Error('chunk payload is required');
     }
 
-    const session = this.sessions.get(sessionId);
-    if (!session || session.userId !== userId) {
-      return { error: 'Session not found', status: 404 };
+    if (chunk.length > MAX_APPEND_CHUNK_BYTES) {
+      return { error: `Chunk exceeds maximum size (${MAX_APPEND_CHUNK_BYTES} bytes)`, status: 413 };
     }
 
-    if (session.expiresAt <= Date.now()) {
-      await this.deleteSessionFiles(session);
-      this.sessions.delete(sessionId);
-      return { error: 'Upload session expired', status: 410 };
-    }
-
-    if (session.status !== 'active') {
-      return { error: `Session is ${session.status}`, status: 409 };
-    }
-
-    if (offset !== session.uploadedBytes) {
-      return {
-        error: 'Offset mismatch',
-        status: 409,
-        expectedOffset: session.uploadedBytes,
-        uploadedBytes: session.uploadedBytes,
-      };
-    }
-
-    if (chunkSha256) {
-      const actual = crypto.createHash('sha256').update(chunk).digest('hex');
-      if (actual !== chunkSha256) {
-        return { error: 'Chunk checksum mismatch', status: 422 };
+    return this.withSessionLock(sessionId, async () => {
+      const session = this.sessions.get(sessionId);
+      if (!session || session.userId !== userId) {
+        return { error: 'Session not found', status: 404 };
       }
-    }
 
-    if (session.uploadedBytes + chunk.length > session.totalSize) {
-      return { error: 'Chunk exceeds declared file size', status: 400 };
-    }
+      if (session.expiresAt <= Date.now()) {
+        await this.deleteSessionFiles(session);
+        this.sessions.delete(sessionId);
+        return { error: 'Upload session expired', status: 410 };
+      }
 
-    await fs.promises.appendFile(session.tempFilePath, chunk);
+      if (session.status !== 'active') {
+        return { error: `Session is ${session.status}`, status: 409 };
+      }
 
-    session.uploadedBytes += chunk.length;
-    session.lastActivityAt = Date.now();
+      if (offset !== session.uploadedBytes) {
+        return {
+          error: 'Offset mismatch',
+          status: 409,
+          expectedOffset: session.uploadedBytes,
+          uploadedBytes: session.uploadedBytes,
+        };
+      }
 
-    return {
-      success: true,
-      session: this.serialize(session),
-      uploadedBytes: session.uploadedBytes,
-      completed: session.uploadedBytes === session.totalSize,
-    };
+      if (chunkSha256) {
+        const actual = crypto.createHash('sha256').update(chunk).digest('hex');
+        if (actual !== chunkSha256) {
+          return { error: 'Chunk checksum mismatch', status: 422 };
+        }
+      }
+
+      if (session.uploadedBytes + chunk.length > session.totalSize) {
+        return { error: 'Chunk exceeds declared file size', status: 400 };
+      }
+
+      await fs.promises.appendFile(session.tempFilePath, chunk);
+
+      session.uploadedBytes += chunk.length;
+      session.lastActivityAt = Date.now();
+
+      return {
+        success: true,
+        session: this.serialize(session),
+        uploadedBytes: session.uploadedBytes,
+        completed: session.uploadedBytes === session.totalSize,
+      };
+    });
   }
 
   async completeSession({ sessionId, userId, supabase, maxRetries = 3 }) {
-    const session = this.sessions.get(sessionId);
-    if (!session || session.userId !== userId) {
-      return { error: 'Session not found', status: 404 };
-    }
+    return this.withSessionLock(sessionId, async () => {
+      const session = this.sessions.get(sessionId);
+      if (!session || session.userId !== userId) {
+        return { error: 'Session not found', status: 404 };
+      }
 
-    if (session.expiresAt <= Date.now()) {
+      if (session.expiresAt <= Date.now()) {
+        await this.deleteSessionFiles(session);
+        this.sessions.delete(sessionId);
+        return { error: 'Upload session expired', status: 410 };
+      }
+
+      if (session.uploadedBytes !== session.totalSize) {
+        return {
+          error: 'Upload is incomplete',
+          status: 409,
+          uploadedBytes: session.uploadedBytes,
+          totalSize: session.totalSize,
+        };
+      }
+
+      // Enforce the same file-type validation policy as normal upload endpoint.
+      const fileTypeValidation = await validateFileType(session.tempFilePath, session.fileName || session.storagePath);
+      if (!fileTypeValidation.valid) {
+        return { error: fileTypeValidation.error || 'Invalid file type', status: 400 };
+      }
+
+      if (session.fileSha256) {
+        const actualHash = await this.hashFile(session.tempFilePath);
+        if (actualHash !== session.fileSha256) {
+          return { error: 'Final file checksum mismatch', status: 422 };
+        }
+      }
+
+      session.status = 'finalizing';
+
+      const result = await uploadFile(
+        supabase,
+        session.tempFilePath,
+        session.bucket,
+        session.storagePath,
+        maxRetries
+      );
+
+      if (!result?.success) {
+        session.status = 'active';
+        return { error: result?.error || 'Finalize upload failed', status: 502 };
+      }
+
+      session.status = 'completed';
       await this.deleteSessionFiles(session);
       this.sessions.delete(sessionId);
-      return { error: 'Upload session expired', status: 410 };
-    }
 
-    if (session.uploadedBytes !== session.totalSize) {
       return {
-        error: 'Upload is incomplete',
-        status: 409,
-        uploadedBytes: session.uploadedBytes,
-        totalSize: session.totalSize,
+        success: true,
+        sessionId,
+        storagePath: session.storagePath,
+        bucket: session.bucket,
+        uploadedBytes: session.totalSize,
+        result,
       };
-    }
-
-    if (session.fileSha256) {
-      const actualHash = await this.hashFile(session.tempFilePath);
-      if (actualHash !== session.fileSha256) {
-        return { error: 'Final file checksum mismatch', status: 422 };
-      }
-    }
-
-    session.status = 'finalizing';
-
-    const result = await uploadFile(
-      supabase,
-      session.tempFilePath,
-      session.bucket,
-      session.storagePath,
-      maxRetries
-    );
-
-    if (!result?.success) {
-      session.status = 'active';
-      return { error: result?.error || 'Finalize upload failed', status: 502 };
-    }
-
-    session.status = 'completed';
-    await this.deleteSessionFiles(session);
-    this.sessions.delete(sessionId);
-
-    return {
-      success: true,
-      sessionId,
-      storagePath: session.storagePath,
-      bucket: session.bucket,
-      uploadedBytes: session.totalSize,
-      result,
-    };
+    });
   }
 
   async deleteSessionFiles(session) {

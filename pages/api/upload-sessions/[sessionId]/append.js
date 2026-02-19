@@ -1,6 +1,6 @@
 import { withAuth } from '../../../../utils/authMiddleware.js';
 import { sendError, sendSuccess, validateMethod } from '../../../../utils/apiHelpers.js';
-import { resumableUploadManager } from '../../../../utils/resumableUploadServer.js';
+import { resumableUploadManager, MAX_APPEND_CHUNK_BYTES } from '../../../../utils/resumableUploadServer.js';
 
 export const config = {
   api: {
@@ -9,9 +9,24 @@ export const config = {
 };
 
 async function readRawBody(req) {
+  const contentLength = Number(req.headers['content-length'] || 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_APPEND_CHUNK_BYTES) {
+    const error = new Error(`Chunk exceeds maximum size (${MAX_APPEND_CHUNK_BYTES} bytes)`);
+    error.statusCode = 413;
+    throw error;
+  }
+
   const chunks = [];
+  let total = 0;
   for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const normalized = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += normalized.length;
+    if (total > MAX_APPEND_CHUNK_BYTES) {
+      const error = new Error(`Chunk exceeds maximum size (${MAX_APPEND_CHUNK_BYTES} bytes)`);
+      error.statusCode = 413;
+      throw error;
+    }
+    chunks.push(normalized);
   }
   return Buffer.concat(chunks);
 }
@@ -38,7 +53,13 @@ async function handler(req, res) {
     return sendError(res, 'Valid upload offset is required', 400);
   }
 
-  const chunk = await readRawBody(req);
+  let chunk;
+  try {
+    chunk = await readRawBody(req);
+  } catch (error) {
+    return sendError(res, error.message || 'Invalid chunk payload', error.statusCode || 400);
+  }
+
   const chunkSha256 = req.headers['x-chunk-sha256'];
 
   const result = await resumableUploadManager.appendChunk({
