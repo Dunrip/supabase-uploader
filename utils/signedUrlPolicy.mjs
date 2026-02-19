@@ -1,7 +1,7 @@
 const DEFAULT_SIGNED_URL_TTL = 60;
 const DEFAULT_SIGNED_URL_TTL_MIN = 30;
 const DEFAULT_SIGNED_URL_TTL_MAX = 300;
-const DEFAULT_ALLOWED_PREFIX_TEMPLATE = '{userId}/';
+const DEFAULT_ALLOWED_PREFIX_TEMPLATE = '*';
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);

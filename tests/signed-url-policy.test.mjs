@@ -7,12 +7,11 @@ import {
   isObjectKeyAllowed,
 } from '../utils/signedUrlPolicy.mjs';
 
-test('happy path: default TTL and scoped object key are allowed', () => {
+test('happy path: default TTL and root object key are allowed by default policy', () => {
   const config = getSignedUrlPolicyConfig({
     SIGNED_URL_TTL_DEFAULT: '60',
     SIGNED_URL_TTL_MIN: '30',
     SIGNED_URL_TTL_MAX: '300',
-    SIGNED_URL_ALLOWED_PREFIXES: '{userId}/',
   });
 
   const ttl = resolveSignedUrlTtl(undefined, config);
@@ -20,7 +19,8 @@ test('happy path: default TTL and scoped object key are allowed', () => {
   assert.equal(ttl.ttl, 60);
 
   const prefixes = resolveAllowedPrefixes('user-123', config);
-  assert.deepEqual(prefixes, ['user-123/']);
+  assert.deepEqual(prefixes, ['*']);
+  assert.equal(isObjectKeyAllowed('report.pdf', prefixes), true);
   assert.equal(isObjectKeyAllowed('user-123/docs/a.pdf', prefixes), true);
 });
 

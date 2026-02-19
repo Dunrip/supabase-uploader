@@ -217,7 +217,7 @@ ENABLE_LOGGING=true
 SIGNED_URL_TTL_DEFAULT=60
 SIGNED_URL_TTL_MIN=30
 SIGNED_URL_TTL_MAX=300
-SIGNED_URL_ALLOWED_PREFIXES={userId}/
+SIGNED_URL_ALLOWED_PREFIXES=*
 ```
 
 ## 🔌 API Notes (Signed URL Retrieval)
@@ -236,7 +236,7 @@ Returns a short-lived signed URL for an object.
 - Requires authentication
 - Validates object key path and bucket
 - Enforces server-side TTL bounds
-- Enforces object key scope via `SIGNED_URL_ALLOWED_PREFIXES` (supports `{userId}` template)
+- Enforces object key scope via `SIGNED_URL_ALLOWED_PREFIXES` (supports `{userId}` template, defaults to `*` for backward compatibility)
 
 ### `GET /api/download`
 
