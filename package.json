@@ -25,7 +25,7 @@
     "dotenv": "^16.3.1",
     "formidable": "^3.5.1",
     "inquirer": "^8.2.7",
-    "next": "^14.0.0",
+    "next": "^15.5.12",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -42,5 +42,9 @@
   },
   "engines": {
     "node": ">=14.0.0"
+  },
+  "overrides": {
+    "glob": "^10.5.0",
+    "minimatch": "^10.2.1"
   }
 }
