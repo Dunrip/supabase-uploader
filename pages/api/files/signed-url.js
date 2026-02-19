@@ -1,13 +1,13 @@
-import { validateMethod, validateQueryParams, sendError } from '../../utils/apiHelpers';
-import { validateStoragePath, validateBucketName } from '../../utils/security';
-import { withAuth } from '../../utils/authMiddleware.js';
-import { createStorageClientWithErrorHandling } from '../../utils/storageClientFactory.js';
+import { validateMethod, validateQueryParams, sendSuccess, sendError } from '../../../utils/apiHelpers';
+import { validateStoragePath, validateBucketName } from '../../../utils/security';
+import { withAuth } from '../../../utils/authMiddleware.js';
+import { createStorageClientWithErrorHandling } from '../../../utils/storageClientFactory.js';
 import {
   getSignedUrlPolicyConfig,
   resolveSignedUrlTtl,
   resolveAllowedPrefixes,
   isObjectKeyAllowed,
-} from '../../utils/signedUrlPolicy.mjs';
+} from '../../../utils/signedUrlPolicy.mjs';
 
 async function handler(req, res) {
   if (!validateMethod(req, res, 'GET')) return;
@@ -41,26 +41,31 @@ async function handler(req, res) {
     return sendError(res, 'Access denied for requested object key scope', 403);
   }
 
+  const download = req.query.download === '1' || req.query.download === 'true';
+
   try {
     const { data, error } = await supabase.storage
       .from(bucketName)
-      .createSignedUrl(storagePath, ttlResult.ttl, {
-        download: true,
-      });
+      .createSignedUrl(storagePath, ttlResult.ttl, download ? { download: true } : undefined);
 
     if (error) {
-      console.error('Signed URL download error:', error);
-      return sendError(res, error.message || 'Failed to generate download URL', 500);
+      console.error('Signed URL retrieval error:', error);
+      return sendError(res, error.message || 'Failed to generate signed URL', 500);
     }
 
     if (!data?.signedUrl) {
-      return sendError(res, 'Failed to generate download URL', 500);
+      return sendError(res, 'Failed to generate signed URL', 500);
     }
 
-    return res.redirect(data.signedUrl);
+    return sendSuccess(res, {
+      signedUrl: data.signedUrl,
+      expiresIn: ttlResult.ttl,
+      bucket: bucketName,
+      path: storagePath,
+    });
   } catch (error) {
-    console.error('Download error:', error);
-    return sendError(res, error.message || 'Failed to download file', 500);
+    console.error('Signed URL retrieval error:', error);
+    return sendError(res, error.message || 'Failed to generate signed URL', 500);
   }
 }
 

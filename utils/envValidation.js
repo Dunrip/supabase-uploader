@@ -107,6 +107,28 @@ const OPTIONAL_ENV_VARS = {
     description: 'Node environment',
     default: 'development',
   },
+  SIGNED_URL_TTL_DEFAULT: {
+    description: 'Default signed URL TTL in seconds',
+    default: '60',
+    validate: (value) => Number.isInteger(Number.parseInt(value, 10)) && Number.parseInt(value, 10) > 0,
+    errorMessage: 'Must be a positive integer (seconds)',
+  },
+  SIGNED_URL_TTL_MIN: {
+    description: 'Minimum allowed signed URL TTL in seconds',
+    default: '30',
+    validate: (value) => Number.isInteger(Number.parseInt(value, 10)) && Number.parseInt(value, 10) > 0,
+    errorMessage: 'Must be a positive integer (seconds)',
+  },
+  SIGNED_URL_TTL_MAX: {
+    description: 'Maximum allowed signed URL TTL in seconds',
+    default: '300',
+    validate: (value) => Number.isInteger(Number.parseInt(value, 10)) && Number.parseInt(value, 10) > 0,
+    errorMessage: 'Must be a positive integer (seconds)',
+  },
+  SIGNED_URL_ALLOWED_PREFIXES: {
+    description: 'Comma-separated object key scope templates (supports {userId})',
+    default: '{userId}/',
+  },
 };
 
 /**
@@ -157,6 +179,18 @@ export function validateEnvironment() {
   }
 
   // Additional security checks
+  const signedUrlMin = Number.parseInt(process.env.SIGNED_URL_TTL_MIN || '30', 10);
+  const signedUrlMax = Number.parseInt(process.env.SIGNED_URL_TTL_MAX || '300', 10);
+  const signedUrlDefault = Number.parseInt(process.env.SIGNED_URL_TTL_DEFAULT || '60', 10);
+
+  if (signedUrlMin > signedUrlMax) {
+    warnings.push('SIGNED_URL_TTL_MIN is greater than SIGNED_URL_TTL_MAX. Runtime will normalize bounds.');
+  }
+
+  if (signedUrlDefault < Math.min(signedUrlMin, signedUrlMax) || signedUrlDefault > Math.max(signedUrlMin, signedUrlMax)) {
+    warnings.push('SIGNED_URL_TTL_DEFAULT is outside min/max bounds. Runtime will clamp to valid range.');
+  }
+
   if (process.env.NODE_ENV === 'production') {
     // Warn if using development-like settings in production
     if (process.env.SUPABASE_URL?.includes('localhost')) {
