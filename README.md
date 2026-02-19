@@ -212,7 +212,35 @@ SUPABASE_BUCKET=files
 MAX_RETRIES=3
 LOG_FILE=supabase-uploader.log
 ENABLE_LOGGING=true
+
+# Signed URL security defaults
+SIGNED_URL_TTL_DEFAULT=60
+SIGNED_URL_TTL_MIN=30
+SIGNED_URL_TTL_MAX=300
+SIGNED_URL_ALLOWED_PREFIXES=*
 ```
+
+## 🔌 API Notes (Signed URL Retrieval)
+
+### `GET /api/files/signed-url`
+
+Returns a short-lived signed URL for an object.
+
+**Query params:**
+- `path` (required)
+- `bucket` (optional, defaults to user default bucket)
+- `ttl` (optional, must be within `SIGNED_URL_TTL_MIN..SIGNED_URL_TTL_MAX`)
+- `download` (optional: `true`/`1` to force attachment)
+
+**Security checks:**
+- Requires authentication
+- Validates object key path and bucket
+- Enforces server-side TTL bounds
+- Enforces object key scope via `SIGNED_URL_ALLOWED_PREFIXES` (supports `{userId}` template, defaults to `*` for backward compatibility)
+
+### `GET /api/download`
+
+Now issues a short-lived signed URL and redirects to Supabase Storage (instead of proxy-streaming through the app server). The same TTL and scope policies are enforced.
 
 ## 🔧 Troubleshooting
 

@@ -2,6 +2,12 @@ import { validateMethod, validateQueryParams, sendError } from '../../utils/apiH
 import { validateStoragePath, validateBucketName } from '../../utils/security';
 import { withAuth } from '../../utils/authMiddleware.js';
 import { createStorageClientWithErrorHandling } from '../../utils/storageClientFactory.js';
+import {
+  getSignedUrlPolicyConfig,
+  resolveSignedUrlTtl,
+  resolveAllowedPrefixes,
+  isObjectKeyAllowed,
+} from '../../utils/signedUrlPolicy.mjs';
 
 async function handler(req, res) {
   if (!validateMethod(req, res, 'GET')) return;
@@ -27,20 +33,21 @@ async function handler(req, res) {
     return sendError(res, bucketValidation.error, 400);
   }
 
-  try {
-    console.log('Preview request for path:', storagePath, 'in bucket:', bucketName);
+  const policyConfig = getSignedUrlPolicyConfig();
+  const ttlResult = resolveSignedUrlTtl(req.query.ttl, policyConfig);
+  if (!ttlResult.valid) {
+    return sendError(res, ttlResult.error, 400);
+  }
 
-    // Create a signed URL for the file
-    // This offloads bandwidth to Supabase and is faster than proxying the file
-    // We set expiry to 3600s (1 hour) to match the previous Cache-Control max-age
+  const allowedPrefixes = resolveAllowedPrefixes(req.user?.id, policyConfig);
+  if (!isObjectKeyAllowed(storagePath, allowedPrefixes)) {
+    return sendError(res, 'Access denied for requested object key scope', 403);
+  }
+
+  try {
     const { data, error } = await supabase.storage
       .from(bucketName)
-      .createSignedUrl(storagePath, 3600);
-
-    // Note: createSignedUrl does not verify file existence efficiently.
-    // The previous retry logic for double-encoded paths is removed as we cannot
-    // easily detect "not found" without an extra round-trip which defeats the performance optimization.
-    // If the path is incorrect, the signed URL will result in a 404 from Supabase.
+      .createSignedUrl(storagePath, ttlResult.ttl);
 
     if (error) {
       console.error('Preview signed URL error:', error);
@@ -51,7 +58,6 @@ async function handler(req, res) {
       return sendError(res, 'Failed to generate preview URL', 500);
     }
 
-    // Redirect to the signed URL
     res.redirect(data.signedUrl);
   } catch (error) {
     console.error('Preview error:', error);
