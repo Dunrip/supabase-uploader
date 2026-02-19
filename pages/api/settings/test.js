@@ -5,9 +5,12 @@
 import { withAuth } from '../../../utils/authMiddleware.js';
 import { validateSupabaseCredentials } from '../../../utils/userSettings.js';
 import { sendSuccess, sendError, validateMethod } from '../../../utils/apiHelpers.js';
+import { enforceRole } from '../../../utils/rbac.js';
 
 async function handler(req, res) {
   if (!validateMethod(req, res, ['POST'])) return;
+
+  if (!enforceRole(req, res, 'admin')) return;
 
   const { supabase_url, supabase_key } = req.body;
 

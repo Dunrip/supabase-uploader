@@ -2,10 +2,13 @@ import { validateMethod, sendError, sendSuccess } from '../../utils/apiHelpers';
 import { validateStoragePath, validateBucketName } from '../../utils/security';
 import { deleteFiles } from '../../utils/storageOperations';
 import { withAuth } from '../../utils/authMiddleware.js';
+import { enforceRole } from '../../utils/rbac.js';
 import { createStorageClientWithErrorHandling } from '../../utils/storageClientFactory.js';
 
 async function handler(req, res) {
   if (!validateMethod(req, res, 'POST')) return;
+  if (!enforceRole(req, res, 'operator')) return;
+  if (!enforceRole(req, res, 'operator')) return;
 
   // Get user's storage client
   const storageResult = await createStorageClientWithErrorHandling(req, res);

@@ -105,6 +105,11 @@ async function handler(req, res) {
           return;
         }
 
+        if (!enforceBandwidthQuota(req, res, buffer.length)) {
+          archive.abort();
+          return;
+        }
+
         // Add file to archive using just the filename (not full path)
         const fileName = path.basename(storagePath);
         archive.append(buffer, { name: fileName });

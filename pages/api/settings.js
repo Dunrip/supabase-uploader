@@ -7,6 +7,7 @@ import { withAuth, getUserId } from '../../utils/authMiddleware.js';
 import { getUserSettingsForClient, saveUserSettings } from '../../utils/userSettings.js';
 import { sendSuccess, sendError, validateMethod } from '../../utils/apiHelpers.js';
 import { invalidateClientCache } from '../../utils/storageClientFactory.js';
+import { enforceRole } from '../../utils/rbac.js';
 
 async function handler(req, res) {
   if (!validateMethod(req, res, ['GET', 'POST'])) return;
@@ -25,6 +26,7 @@ async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
+      if (!enforceRole(req, res, 'admin')) return;
       // Save user settings
       const { supabase_url, supabase_key, default_bucket, max_retries, theme } = req.body;
 
