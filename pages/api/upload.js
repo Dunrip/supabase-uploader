@@ -5,6 +5,9 @@ import { validateMethod, sendSuccess, sendError } from '../../utils/apiHelpers';
 import { validateStoragePath, validateBucketName, validateFileType, validateFilename } from '../../utils/security';
 import { withAuth } from '../../utils/authMiddleware.js';
 import { createStorageClientWithErrorHandling } from '../../utils/storageClientFactory.js';
+import { enforceStorageQuota, enforceBandwidthQuota } from '../../utils/quota.js';
+import { emitUploadEvent } from '../../utils/eventPipeline.mjs';
+import { appendAuditEvent, buildAuditEventFromRequest } from '../../utils/auditLog.js';
 
 export const config = {
   api: {
@@ -25,6 +28,7 @@ async function handler(req, res) {
   const { client: supabase, settings } = storageResult;
 
   let uploadedFile = null;
+  let eventContext = {};
 
   try {
     const uploadDir = await getTempDir();
@@ -45,6 +49,16 @@ async function handler(req, res) {
     }
 
     uploadedFile = file;
+
+    if (!await enforceStorageQuota(req, res, supabase, fields.bucket?.[0] || settings.default_bucket || 'files', file.size || 0)) {
+      await cleanupTempFile(file.filepath);
+      return;
+    }
+
+    if (!enforceBandwidthQuota(req, res, file.size || 0)) {
+      await cleanupTempFile(file.filepath);
+      return;
+    }
 
     // Validate filename
     const filenameValidation = validateFilename(file.originalFilename);
@@ -112,6 +126,16 @@ async function handler(req, res) {
       }
     }
 
+    eventContext = {
+      userId: req.user?.id,
+      bucket: bucketName,
+      path: storagePath,
+      originalFilename: file.originalFilename,
+      size: file.size,
+    };
+
+    await emitUploadEvent('upload.started', eventContext);
+
     const uploadPromise = uploadFile(supabase, file.filepath, bucketName, storagePath, settings.max_retries);
     const result = await withTimeout(
       uploadPromise,
@@ -125,6 +149,22 @@ async function handler(req, res) {
       throw new Error(result?.error || 'Upload failed');
     }
 
+    await emitUploadEvent('upload.completed', {
+      ...eventContext,
+      uploadedPath: result.path,
+      publicUrl: result.publicUrl,
+      completedAt: new Date().toISOString(),
+    });
+
+    appendAuditEvent(buildAuditEventFromRequest(req, {
+      action: 'upload_file',
+      resource: 'storage_object',
+      bucket: bucketName,
+      path: storagePath,
+      bytes: file.size || 0,
+      status: 'success',
+    }));
+
     sendSuccess(res, result);
   } catch (error) {
     console.error('Upload failed:', error);
@@ -133,10 +173,23 @@ async function handler(req, res) {
       await cleanupTempFile(uploadedFile.filepath);
     }
 
+    await emitUploadEvent('upload.failed', {
+      ...eventContext,
+      error: error.message || 'Unknown upload error',
+      failedAt: new Date().toISOString(),
+    });
+
+    appendAuditEvent(buildAuditEventFromRequest(req, {
+      action: 'upload_file',
+      resource: 'storage_object',
+      status: 'error',
+      error: error.message,
+    }));
+
     sendError(res, error.message || 'Upload failed. Please check server logs.', 500);
   }
 }
 
 // Skip CSRF for file uploads - multipart form data doesn't support custom headers easily
 // Authentication is still required and provides sufficient protection
-export default withAuth(handler, { skipCsrf: true });
+export default withAuth(handler, { skipCsrf: true, rolesAllowed: ['operator', 'admin'] });
