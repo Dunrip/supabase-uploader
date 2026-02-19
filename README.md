@@ -24,6 +24,7 @@ A beautiful dark-themed web interface for managing files in Supabase Storage. Ea
 - [CLI Usage](#-cli-usage)
 - [Using as a Module](#-using-as-a-module)
 - [Configuration](#-configuration)
+- [Webhook Consumer Guide](#-webhook-consumer-guide)
 - [Troubleshooting](#-troubleshooting)
 - [Security](#-security)
 - [Tech Stack](#-tech-stack)
@@ -219,6 +220,10 @@ SIGNED_URL_TTL_DEFAULT=60
 SIGNED_URL_TTL_MIN=30
 SIGNED_URL_TTL_MAX=300
 SIGNED_URL_ALLOWED_PREFIXES=*
+
+# Direct upload mode
+DIRECT_UPLOAD_MAX_BYTES=104857600
+DIRECT_UPLOAD_ALLOWED_MIME_REGEX=
 ```
 
 ## 🔌 API Notes (Signed URL Retrieval)
@@ -243,6 +248,7 @@ Returns a short-lived signed URL for an object.
 
 Now issues a short-lived signed URL and redirects to Supabase Storage (instead of proxy-streaming through the app server). The same TTL and scope policies are enforced.
 
+<<<<<<< HEAD
 ## 🔁 Resumable Upload API (MVP)
 
 This MVP exposes a server-managed resumable session API (sequential chunk upload).
@@ -306,6 +312,14 @@ Server validates completeness (`uploadedBytes === totalSize`), optionally valida
 3. On network failure/timeouts, fetch session state (`GET append`) and resume from `nextOffset`.
 4. Call complete when all bytes are uploaded.
 
+## 🚀 Direct Upload API
+
+### `POST /api/upload/intents`
+Creates an upload intent and returns a pre-signed upload payload.
+
+### `POST /api/upload/finalize`
+Finalizes an uploaded object with ownership/scope checks and idempotency via `Idempotency-Key`.
+
 ## 🔧 Troubleshooting
 
 **"Authentication required"**
@@ -336,6 +350,17 @@ Server validates completeness (`uploadedBytes === totalSize`), optionally valida
 - ✅ **Security Headers** - CSP, X-Frame-Options, and more
 
 See `SECURITY.md` for detailed security documentation.
+
+### Baseline controls (Issue #22)
+
+- **RBAC:** `admin` / `operator` / `read-only`
+- **Quotas:** request, bandwidth, and storage baseline enforcement hooks
+- **Audit trail:** append-only hash-chained event log + `GET /api/audit` query endpoint
+
+Configure via `env.example`:
+`RBAC_ADMIN_EMAILS`, `RBAC_OPERATOR_EMAILS`, `QUOTA_REQUEST_WINDOW_MS`,
+`QUOTA_MAX_REQUESTS_PER_WINDOW`, `QUOTA_MAX_BANDWIDTH_BYTES_PER_WINDOW`,
+`QUOTA_MAX_STORAGE_BYTES`, `AUDIT_LOG_FILE`.
 
 ## 🛠️ Tech Stack
 
