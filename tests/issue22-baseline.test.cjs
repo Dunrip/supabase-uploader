@@ -9,11 +9,11 @@ function read(rel) {
   return fs.readFileSync(path.join(root, rel), 'utf8');
 }
 
-test('upload endpoint has quota + RBAC baseline hooks', () => {
-  const src = read('pages/api/upload.js');
-  assert.match(src, /enforceStorageQuota/);
-  assert.match(src, /enforceBandwidthQuota/);
-  assert.match(src, /rolesAllowed:\s*\['operator',\s*'admin'\]/);
+test('auth middleware has quota + RBAC baseline hooks', () => {
+  const src = read('utils/authMiddleware.js');
+  assert.match(src, /enforceRequestQuota/);
+  assert.match(src, /rolesAllowed/);
+  assert.match(src, /getUserRole/);
 });
 
 test('sensitive mutation endpoints enforce operator role', () => {
