@@ -37,6 +37,7 @@ A beautiful dark-themed web interface for managing files in Supabase Storage. Ea
 - 🌐 **Per-User Supabase Connection** - Each user connects their own Supabase project
 - 🔒 **Encrypted API Keys** - User credentials encrypted with AES-256-GCM at rest
 - 📤 **Upload Files** - Drag & drop with progress tracking and folder support
+- 🔁 **Resumable Upload Sessions (MVP)** - Create/append/complete flow for retry-safe large uploads
 - 📋 **File Management** - List, preview, download, rename, and delete files
 - 📁 **Folder Organization** - Create folders, move files, breadcrumb navigation
 - 🔍 **Search & Filter** - Find files by name, filter by type, sort by date/size/name
@@ -241,6 +242,69 @@ Returns a short-lived signed URL for an object.
 ### `GET /api/download`
 
 Now issues a short-lived signed URL and redirects to Supabase Storage (instead of proxy-streaming through the app server). The same TTL and scope policies are enforced.
+
+## 🔁 Resumable Upload API (MVP)
+
+This MVP exposes a server-managed resumable session API (sequential chunk upload).
+
+### 1) Create session
+
+`POST /api/upload-sessions/create`
+
+Body:
+```json
+{
+  "bucket": "files",
+  "path": "videos/big.mp4",
+  "fileName": "big.mp4",
+  "totalSize": 15728640,
+  "chunkSize": 6291456,
+  "fileSha256": "optional-final-sha256",
+  "expiresInSeconds": 3600
+}
+```
+
+Response (`201`):
+- `uploadId` / `session.id`
+- `nextOffset` (starts at `0`)
+- `expiresAt`
+
+### 2) Append chunk
+
+`PATCH /api/upload-sessions/:sessionId/append`
+
+Headers:
+- `Upload-Offset: <current_offset>` (required)
+- `X-Chunk-Sha256: <sha256>` (optional integrity check)
+
+Body:
+- raw binary chunk bytes
+
+Response (`200`):
+- `uploadedBytes`
+- `nextOffset`
+- `completed` (boolean)
+
+If interrupted, call `GET /api/upload-sessions/:sessionId/append` to read current `nextOffset` and continue from that offset.
+If offset is wrong, API returns `409` with `expectedOffset`.
+
+### 3) Complete upload
+
+`POST /api/upload-sessions/:sessionId/complete`
+
+Server validates completeness (`uploadedBytes === totalSize`), optionally validates final SHA-256 (if provided at creation), then uploads the assembled temp file to Supabase Storage.
+
+### Expiration
+
+- Sessions auto-expire (default 1 hour, max 24 hours).
+- Expired sessions return `410 Gone` and temp files are cleaned up.
+
+### Client flow summary
+
+1. Create session once.
+2. Upload chunks sequentially with `Upload-Offset`.
+3. On network failure/timeouts, fetch session state (`GET append`) and resume from `nextOffset`.
+4. Call complete when all bytes are uploaded.
 
 ## 🔧 Troubleshooting
 
